@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cancionero de la Iglesia</title>
+  <title>Cancionero Iglesia de Dios 7d</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#1e3a8a">
   <style>
@@ -15,6 +15,7 @@
       --text: #0f172a;
       --chord: #d97706;
       --border: #cbd5e1;
+      --danger: #dc2626;
     }
 
     body {
@@ -27,7 +28,7 @@
 
     .container { max-width: 800px; margin: 0 auto; }
     header { text-align: center; margin-bottom: 20px; }
-    h1 { margin: 0 0 4px 0; color: var(--primary); }
+    h1 { margin: 0 0 4px 0; color: var(--primary); font-size: 24px; }
 
     .status-bar {
       display: flex;
@@ -54,7 +55,17 @@
       font-family: inherit;
     }
 
-    textarea { height: 220px; font-family: monospace; line-height: 1.5; }
+    textarea { height: 180px; font-family: monospace; line-height: 1.5; }
+    
+    .live-preview {
+      background: #f1f5f9;
+      border: 1px dashed var(--border);
+      padding: 12px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      min-height: 80px;
+    }
+
     .song-list { display: flex; flex-direction: column; gap: 10px; }
 
     .song-card {
@@ -83,6 +94,15 @@
       border-radius: 6px;
     }
 
+    .admin-menu {
+      margin-top: 25px;
+      padding-top: 15px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
     button {
       background: var(--accent);
       color: white;
@@ -96,6 +116,8 @@
 
     button.secondary { background: #64748b; }
     button.success { background: #16a34a; }
+    button.danger { background: var(--danger); }
+    button.small { padding: 6px 10px; font-size: 12px; }
 
     .song-lines { font-family: "Courier New", Courier, monospace; font-size: 16px; line-height: 1.5; }
     .line-block { margin-bottom: 12px; }
@@ -108,7 +130,7 @@
 
 <div class="container">
   <header>
-    <h1>Cancionero Iglesia</h1>
+    <h1>Cancionero Iglesia de Dios 7d</h1>
     <p style="margin: 4px 0 0 0; color: #64748b;">Alabanzas con transposición automática</p>
   </header>
 
@@ -139,20 +161,32 @@
     </div>
 
     <div id="song-content" class="song-lines"></div>
+
+    <!-- Menú de Administración Oculto/Protegido -->
+    <div class="admin-menu">
+      <button class="secondary small" onclick="toggleAdminActions()">⚙️ Opciones</button>
+      <div id="admin-buttons" style="display: none; gap: 8px;">
+        <button class="secondary small" onclick="editCurrentSong()">✏️ Editar</button>
+        <button class="danger small" onclick="deleteCurrentSong()">🗑️ Eliminar</button>
+      </div>
+    </div>
   </div>
 
   <div id="song-editor" class="editor">
     <button class="secondary" onclick="showList()">← Cancelar</button>
-    <h2>Agregar Nueva Canción</h2>
+    <h2 id="editor-heading">Agregar Nueva Canción</h2>
     
     <div class="help-box">
-      <strong>¡Ahorra tiempo!</strong> Pega la letra con los acordes arriba. La app los separará y coloreará automáticamente.
+      <strong>Escribe o pega tu alabanza:</strong> Coloca los acordes arriba de las líneas. La vista previa coloreará automáticamente los acordes en naranja.
     </div>
 
     <input type="text" id="edit-title" placeholder="Título de la canción">
     <input type="text" id="edit-author" placeholder="Autor / Grupo (Opcional)">
     
-    <textarea id="edit-raw" placeholder="G                 C&#10;Señor mi Dios al contemplar los cielos..."></textarea>
+    <textarea id="edit-raw" placeholder="G                 C&#10;Señor mi Dios al contemplar los cielos..." oninput="updateLivePreview()"></textarea>
+
+    <label style="font-size: 13px; font-weight: bold; color: #64748b;">Vista previa en tiempo real:</label>
+    <div id="editor-preview" class="live-preview song-lines"></div>
 
     <button class="success" style="width: 100%; padding: 14px;" onclick="saveSong()">Guardar Canción</button>
   </div>
@@ -177,6 +211,7 @@
   const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   let songs = [];
   let currentSong = null;
+  let editingSongId = null;
   let currentTransposeSteps = 0;
 
   if ('serviceWorker' in navigator) {
@@ -202,17 +237,11 @@
     if (navigator.onLine) {
       statusEl.innerHTML = '<span class="badge-online">En línea</span>';
       const pending = JSON.parse(localStorage.getItem('pending_sync') || '[]');
-      if (pending.length > 0) {
-        syncEl.innerText = `${pending.length} pendiente(s)`;
-      } else {
-        syncEl.innerText = '';
-      }
+      syncEl.innerText = pending.length > 0 ? `${pending.length} pendiente(s)` : '';
     } else {
       statusEl.innerHTML = '<span class="badge-offline">Modo Offline</span>';
       const pending = JSON.parse(localStorage.getItem('pending_sync') || '[]');
-      if (pending.length > 0) {
-        syncEl.innerText = `${pending.length} por subir`;
-      }
+      syncEl.innerText = pending.length > 0 ? `${pending.length} por subir` : '';
     }
   }
 
@@ -229,7 +258,7 @@
       card.innerHTML = `
         <div>
           <strong>${song.title}</strong>
-          <div style="font-size:12px; color:#64748b;">${song.author || 'Desconocido'}</div>
+          <div style="font-size:12px; color:#64748b;">${song.author || 'Iglesia de Dios 7d'}</div>
         </div>
         <span class="badge">${song.originalKey || 'C'}</span>
       `;
@@ -293,6 +322,39 @@
     }
 
     return { lines: parsedLines, key: detectedKey };
+  }
+
+  function updateLivePreview() {
+    const rawText = document.getElementById('edit-raw').value;
+    const previewEl = document.getElementById('editor-preview');
+    if (!rawText.trim()) {
+      previewEl.innerHTML = '<em style="color:#94a3b8;">Aquí verás cómo se verá tu canción formateada...</em>';
+      return;
+    }
+
+    const { lines } = parseRawSong(rawText);
+    previewEl.innerHTML = '';
+
+    lines.forEach(line => {
+      const block = document.createElement('div');
+      block.className = 'line-block';
+
+      if (line.chords) {
+        const chordDiv = document.createElement('div');
+        chordDiv.className = 'chord-line';
+        chordDiv.innerText = line.chords;
+        block.appendChild(chordDiv);
+      }
+
+      if (line.text) {
+        const textDiv = document.createElement('div');
+        textDiv.className = 'text-line';
+        textDiv.innerText = line.text;
+        block.appendChild(textDiv);
+      }
+
+      previewEl.appendChild(block);
+    });
   }
 
   function transposeNote(note, steps) {
@@ -369,22 +431,61 @@
     document.getElementById('song-title').innerText = currentSong.title;
     document.getElementById('song-author').innerText = currentSong.author ? `Por: ${currentSong.author}` : '';
     document.getElementById('original-key').innerText = currentSong.originalKey;
+    document.getElementById('admin-buttons').style.display = 'none';
     renderTransposedContent();
   }
 
   function openEditor() {
+    editingSongId = null;
+    document.getElementById('editor-heading').innerText = "Agregar Nueva Canción";
     document.getElementById('list-view').style.display = 'none';
     document.getElementById('song-viewer').style.display = 'none';
     document.getElementById('song-editor').style.display = 'block';
     document.getElementById('edit-title').value = '';
     document.getElementById('edit-author').value = '';
     document.getElementById('edit-raw').value = '';
+    updateLivePreview();
   }
 
   function showList() {
     document.getElementById('list-view').style.display = 'block';
     document.getElementById('song-viewer').style.display = 'none';
     document.getElementById('song-editor').style.display = 'none';
+  }
+
+  function toggleAdminActions() {
+    const el = document.getElementById('admin-buttons');
+    el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+  }
+
+  function editCurrentSong() {
+    if (!currentSong) return;
+    editingSongId = currentSong.id;
+    document.getElementById('editor-heading').innerText = "Editar Canción";
+    
+    let rawText = "";
+    currentSong.lines.forEach(l => {
+      if (l.chords) rawText += l.chords + "\n";
+      if (l.text) rawText += l.text + "\n";
+    });
+
+    document.getElementById('edit-title').value = currentSong.title;
+    document.getElementById('edit-author').value = currentSong.author || '';
+    document.getElementById('edit-raw').value = rawText;
+
+    document.getElementById('song-viewer').style.display = 'none';
+    document.getElementById('song-editor').style.display = 'block';
+    updateLivePreview();
+  }
+
+  function deleteCurrentSong() {
+    if (!currentSong) return;
+    if (confirm(`¿Estás seguro de que deseas eliminar "${currentSong.title}"?`)) {
+      songs = songs.filter(s => s.id !== currentSong.id);
+      localStorage.setItem('church_songs', JSON.stringify(songs));
+      renderSongList(songs);
+      showList();
+    }
   }
 
   function saveSong() {
@@ -399,24 +500,28 @@
 
     const { lines, key } = parseRawSong(rawText);
 
-    const newSong = {
-      id: Date.now().toString(),
-      title: title,
-      author: author || "Iglesia Local",
-      originalKey: key,
-      lines: lines
-    };
+    if (editingSongId) {
+      const idx = songs.findIndex(s => s.id === editingSongId);
+      if (idx !== -1) {
+        songs[idx].title = title;
+        songs[idx].author = author || "Iglesia de Dios 7d";
+        songs[idx].originalKey = key;
+        songs[idx].lines = lines;
+      }
+    } else {
+      const newSong = {
+        id: Date.now().toString(),
+        title: title,
+        author: author || "Iglesia de Dios 7d",
+        originalKey: key,
+        lines: lines
+      };
+      songs.unshift(newSong);
+    }
 
-    songs.unshift(newSong);
     localStorage.setItem('church_songs', JSON.stringify(songs));
-
-    const pending = JSON.parse(localStorage.getItem('pending_sync') || '[]');
-    pending.push(newSong);
-    localStorage.setItem('pending_sync', JSON.stringify(pending));
-
     renderSongList(songs);
-    updateSyncStatus();
-    openSong(newSong.id);
+    showList();
   }
 
   loadLocalSongs();
