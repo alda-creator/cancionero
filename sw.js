@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cancionero-v4';
+const CACHE_NAME = 'cancionero-v5';
 const urlsToCache = [
   './',
   './index.html',
