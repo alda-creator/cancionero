@@ -90,7 +90,7 @@
       gap: 10px;
       margin-bottom: 20px;
       background: #f1f5f9;
-      padding: 10px;
+      padding: 12px;
       border-radius: 6px;
     }
 
@@ -118,6 +118,7 @@
     button.success { background: #16a34a; }
     button.danger { background: var(--danger); }
     button.small { padding: 6px 10px; font-size: 12px; }
+    button.toggle { background: #0284c7; }
 
     .song-lines { font-family: "Courier New", Courier, monospace; font-size: 16px; line-height: 1.5; }
     .line-block { margin-bottom: 12px; }
@@ -158,11 +159,11 @@
       <button onclick="transpose(-1)">-1 Semitono</button>
       <button onclick="transpose(1)">+1 Semitono</button>
       <button class="secondary" onclick="resetKey()">Restablecer</button>
+      <button class="toggle" id="notation-btn" onclick="toggleNotation()">Sistema: C, D, E</button>
     </div>
 
     <div id="song-content" class="song-lines"></div>
 
-    <!-- Menú de Administración Oculto/Protegido -->
     <div class="admin-menu">
       <button class="secondary small" onclick="toggleAdminActions()">⚙️ Opciones</button>
       <div id="admin-buttons" style="display: none; gap: 8px;">
@@ -177,13 +178,13 @@
     <h2 id="editor-heading">Agregar Nueva Canción</h2>
     
     <div class="help-box">
-      <strong>Escribe o pega tu alabanza:</strong> Coloca los acordes arriba de las líneas. La vista previa coloreará automáticamente los acordes en naranja.
+      <strong>Puedes escribir usando C, D, E o Do, Re, Mi:</strong> La app reconoce acordes mayores, menores, bemoles, sostenidos y los formateará automáticamente.
     </div>
 
     <input type="text" id="edit-title" placeholder="Título de la canción">
     <input type="text" id="edit-author" placeholder="Autor / Grupo (Opcional)">
     
-    <textarea id="edit-raw" placeholder="G                 C&#10;Señor mi Dios al contemplar los cielos..." oninput="updateLivePreview()"></textarea>
+    <textarea id="edit-raw" placeholder="Sol               Do&#10;Señor mi Dios al contemplar los cielos..." oninput="updateLivePreview()"></textarea>
 
     <label style="font-size: 13px; font-weight: bold; color: #64748b;">Vista previa en tiempo real:</label>
     <div id="editor-preview" class="live-preview song-lines"></div>
@@ -208,11 +209,26 @@
     }
   ];
 
-  const scale = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const scaleA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const scaleL = ['Do', 'Do#', 'Re', 'Re#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si'];
+
+  const angloToLatinoMap = {
+    'C': 'Do', 'D': 'Re', 'E': 'Mi', 'F': 'Fa', 'G': 'Sol', 'A': 'La', 'B': 'Si',
+    'C#': 'Do#', 'D#': 'Re#', 'F#': 'Fa#', 'G#': 'Sol#', 'A#': 'La#',
+    'Db': 'Reb', 'Eb': 'Mib', 'Gb': 'Solb', 'Ab': 'Lab', 'Bb': 'Sib'
+  };
+
+  const latinoToAngloMap = {
+    'DO': 'C', 'RE': 'D', 'MI': 'E', 'FA': 'F', 'SOL': 'G', 'LA': 'A', 'SI': 'B',
+    'DO#': 'C#', 'RE#': 'D#', 'FA#': 'F#', 'SOL#': 'G#', 'LA#': 'A#',
+    'DOB': 'Cb', 'REB': 'Db', 'MIB': 'Eb', 'FAB': 'Fb', 'SOLB': 'Gb', 'LAB': 'Ab', 'SIB': 'Bb'
+  };
+
   let songs = [];
   let currentSong = null;
   let editingSongId = null;
   let currentTransposeSteps = 0;
+  let useLatinoNotation = false;
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Registrado'));
@@ -248,6 +264,12 @@
   window.addEventListener('online', updateSyncStatus);
   window.addEventListener('offline', updateSyncStatus);
 
+  function formatKeyDisplay(key) {
+    if (!key) return 'C';
+    if (!useLatinoNotation) return key;
+    return angloToLatinoMap[key] || key;
+  }
+
   function renderSongList(items) {
     const container = document.getElementById('song-container');
     container.innerHTML = '';
@@ -260,7 +282,7 @@
           <strong>${song.title}</strong>
           <div style="font-size:12px; color:#64748b;">${song.author || 'Iglesia de Dios 7d'}</div>
         </div>
-        <span class="badge">${song.originalKey || 'C'}</span>
+        <span class="badge">${formatKeyDisplay(song.originalKey)}</span>
       `;
       container.appendChild(card);
     });
@@ -276,7 +298,7 @@
     renderSongList(filtered);
   }
 
-  const CHORD_REGEX = /^[A-G][#b]?(m|maj|min|dim|aug|sus)?[0-9]?(\/[A-G][#b]?)?$/;
+  const CHORD_REGEX = /^([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?(m|maj|min|dim|aug|sus)?[0-9]?(\/([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?)?$/i;
 
   function isChordToken(token) {
     if (!token) return false;
@@ -291,6 +313,13 @@
     return (chordCount / tokens.length) >= 0.5;
   }
 
+  function normalizeChordToAnglo(chord) {
+    return chord.replace(/([A-Z]+[#b]?)/gi, (match) => {
+      const upper = match.toUpperCase();
+      return latinoToAngloMap[upper] || match;
+    });
+  }
+
   function parseRawSong(rawText) {
     const rawLines = rawText.split('\n');
     const parsedLines = [];
@@ -298,8 +327,10 @@
     let firstChordFound = false;
 
     for (let i = 0; i < rawLines.length; i++) {
-      const current = rawLines[i];
+      let current = rawLines[i];
       if (isChordLine(current)) {
+        current = current.replace(/([A-ZÑa-z]+[#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-ZÑa-z]+[#b]?)?)/gi, (m) => normalizeChordToAnglo(m));
+
         if (!firstChordFound) {
           const firstChord = current.trim().split(/\s+/)[0];
           const match = firstChord.match(/^([A-G][#b]?)/);
@@ -342,7 +373,7 @@
       if (line.chords) {
         const chordDiv = document.createElement('div');
         chordDiv.className = 'chord-line';
-        chordDiv.innerText = line.chords;
+        chordDiv.innerText = convertChordLineNotation(line.chords, useLatinoNotation);
         block.appendChild(chordDiv);
       }
 
@@ -368,30 +399,61 @@
     const flats = {'Db':'C#', 'Eb':'D#', 'Gb':'F#', 'Ab':'G#', 'Bb':'A#'};
     if (flats[root]) root = flats[root];
 
-    let index = scale.indexOf(root);
+    let index = scaleA.indexOf(root);
     if (index === -1) return note;
 
     let newIndex = (index + steps) % 12;
     if (newIndex < 0) newIndex += 12;
 
-    return scale[newIndex] + suffix;
+    return scaleA[newIndex] + suffix;
+  }
+
+  function convertChordNotation(chord, toLatino) {
+    if (!toLatino) return chord;
+    return chord.replace(/([A-G][#b]?)/g, (m) => angloToLatinoMap[m] || m);
+  }
+
+  function convertChordLineNotation(chordLine, toLatino) {
+    if (!toLatino) return chordLine;
+    let modified = chordLine;
+    let result = "";
+    let i = 0;
+
+    const chordRegex = /([A-G][#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-G][#b]?)?)/g;
+    let match;
+
+    while ((match = chordRegex.exec(chordLine)) !== null) {
+      result += chordLine.substring(i, match.index);
+      const originalChord = match[0];
+      const translatedChord = convertChordNotation(originalChord, true);
+      result += translatedChord;
+      i = match.index + originalChord.length;
+    }
+    result += chordLine.substring(i);
+    return result;
   }
 
   function transposeChordLine(chordLine, steps) {
-    if (!chordLine || steps === 0) return chordLine;
+    if (!chordLine) return chordLine;
 
-    return chordLine.replace(/([A-G][#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-G][#b]?)?)/g, (match) => {
-      if (match.includes('/')) {
-        const parts = match.split('/');
-        return transposeNote(parts[0], steps) + '/' + transposeNote(parts[1], steps);
-      }
-      return transposeNote(match, steps);
-    });
+    let transposed = chordLine;
+    if (steps !== 0) {
+      transposed = chordLine.replace(/([A-G][#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-G][#b]?)?)/g, (match) => {
+        if (match.includes('/')) {
+          const parts = match.split('/');
+          return transposeNote(parts[0], steps) + '/' + transposeNote(parts[1], steps);
+        }
+        return transposeNote(match, steps);
+      });
+    }
+
+    return convertChordLineNotation(transposed, useLatinoNotation);
   }
 
   function renderTransposedContent() {
-    const transposedKey = transposeNote(currentSong.originalKey, currentTransposeSteps);
-    document.getElementById('current-key').innerText = transposedKey;
+    const baseKey = transposeNote(currentSong.originalKey, currentTransposeSteps);
+    document.getElementById('original-key').innerText = formatKeyDisplay(currentSong.originalKey);
+    document.getElementById('current-key').innerText = formatKeyDisplay(baseKey);
 
     const container = document.getElementById('song-content');
     container.innerHTML = '';
@@ -421,6 +483,14 @@
   function transpose(steps) { currentTransposeSteps += steps; renderTransposedContent(); }
   function resetKey() { currentTransposeSteps = 0; renderTransposedContent(); }
 
+  function toggleNotation() {
+    useLatinoNotation = !useLatinoNotation;
+    const btn = document.getElementById('notation-btn');
+    btn.innerText = useLatinoNotation ? "Sistema: Do, Re, Mi" : "Sistema: C, D, E";
+    renderTransposedContent();
+    renderSongList(songs);
+  }
+
   function openSong(id) {
     currentSong = songs.find(s => s.id === id);
     currentTransposeSteps = 0;
@@ -430,7 +500,6 @@
     
     document.getElementById('song-title').innerText = currentSong.title;
     document.getElementById('song-author').innerText = currentSong.author ? `Por: ${currentSong.author}` : '';
-    document.getElementById('original-key').innerText = currentSong.originalKey;
     document.getElementById('admin-buttons').style.display = 'none';
     renderTransposedContent();
   }
