@@ -3,668 +3,396 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cancionero Iglesia de Dios 7d</title>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1e3a8a">
+  <title>Cancionero - Iglesia de Dios 7d</title>
   <style>
     :root {
-      --primary: #1e3a8a;
-      --accent: #2563eb;
-      --bg: #f8fafc;
-      --card: #ffffff;
-      --text: #0f172a;
-      --chord: #d97706;
-      --border: #cbd5e1;
-      --danger: #dc2626;
+      --primary: #1a365d;
+      --accent: #2b6cb0;
+      --bg: #f7fafc;
+      --card-bg: #ffffff;
+      --text: #2d3748;
+      --chord-color: #c53030;
     }
 
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       background-color: var(--bg);
       color: var(--text);
       margin: 0;
-      padding: 16px;
+      padding: 15px;
     }
 
-    .container { max-width: 800px; margin: 0 auto; }
-    header { text-align: center; margin-bottom: 20px; }
-    h1 { margin: 0 0 4px 0; color: var(--primary); font-size: 24px; }
-
-    .status-bar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 12px;
-      padding: 8px 12px;
-      background: #e2e8f0;
-      border-radius: 6px;
-      font-size: 13px;
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
     }
 
-    .badge-online { background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
-    .badge-offline { background: #fee2e2; color: #991b1b; padding: 2px 8px; border-radius: 12px; font-weight: bold; }
-
-    input[type="text"] {
-      width: 100%;
-      padding: 12px;
-      font-size: 16px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      box-sizing: border-box;
-      margin-bottom: 12px;
-      font-family: inherit;
-    }
-
-    /* Editor con Resaltado de Acordes */
-    .editor-wrapper {
-      position: relative;
-      width: 100%;
-      height: 280px;
-      border: 2px solid var(--border);
-      border-radius: 8px;
-      background: #ffffff;
-      overflow: hidden;
-      margin-bottom: 12px;
-      box-sizing: border-box;
-    }
-
-    .editor-wrapper textarea, 
-    .editor-wrapper .editor-highlight {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      padding: 12px;
-      font-family: "Courier New", Courier, monospace;
-      font-size: 15px;
-      line-height: 1.5;
-      white-space: pre;
-      overflow-x: auto;
-      overflow-y: auto;
-      box-sizing: border-box;
-      margin: 0;
-      border: none;
-      background: transparent;
-    }
-
-    .editor-wrapper textarea {
-      color: transparent;
-      caret-color: var(--text);
-      resize: none;
-      z-index: 2;
-      outline: none;
-    }
-
-    .editor-wrapper .editor-highlight {
-      z-index: 1;
-      pointer-events: none;
-      color: var(--text);
-    }
-
-    .highlight-chord {
-      color: var(--chord);
-      font-weight: bold;
-    }
-
-    .song-list { display: flex; flex-direction: column; gap: 10px; }
-
-    .song-card {
-      background: var(--card);
-      padding: 14px 18px;
-      border-radius: 8px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      cursor: pointer;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-
-    .song-card:hover { border-left: 4px solid var(--accent); }
-    .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold; }
-    .viewer, .editor { display: none; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-
-    .lacuerda-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: #f1f5f9;
-      padding: 8px 12px;
-      border-radius: 8px;
-      margin-bottom: 16px;
-      border: 1px solid var(--border);
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .lacuerda-title {
-      font-weight: bold;
-      font-size: 15px;
-      color: #334155;
-    }
-
-    .lacuerda-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow-x: auto;
-    }
-
-    .btn-circle {
-      background: #64748b;
+    header {
+      background: var(--primary);
       color: white;
-      border: none;
-      width: 38px;
-      height: 38px;
-      border-radius: 50%;
-      font-weight: bold;
-      font-size: 13px;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 20px;
       display: flex;
+      justify-content: space-between;
       align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      flex-shrink: 0;
-      padding: 0;
     }
 
-    .btn-circle:active { background: #334155; transform: scale(0.95); }
-    .btn-circle.accent { background: #2563eb; }
-    .btn-circle.wide { width: auto; padding: 0 10px; border-radius: 20px; }
+    h1 { margin: 0; font-size: 1.4rem; }
 
-    .admin-menu {
-      margin-top: 25px;
-      padding-top: 15px;
-      border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: flex-end;
-      gap: 10px;
-    }
-
-    button.btn-main {
+    .btn {
       background: var(--accent);
       color: white;
       border: none;
-      padding: 10px 16px;
+      padding: 8px 14px;
       border-radius: 6px;
-      font-weight: bold;
       cursor: pointer;
-      font-size: 14px;
+      font-weight: bold;
     }
 
-    button.secondary { background: #64748b; }
-    button.success { background: #16a34a; }
-    button.danger { background: var(--danger); }
-    button.small { padding: 6px 10px; font-size: 12px; }
+    .btn-danger { background: #e53e3e; }
+    .btn-secondary { background: #718096; }
 
-    .song-lines { font-family: "Courier New", Courier, monospace; font-size: 16px; line-height: 1.5; }
-    .line-block { margin-bottom: 12px; }
-    .chord-line { color: var(--chord); font-weight: bold; min-height: 1.2em; white-space: pre; }
-    .text-line { white-space: pre-wrap; }
-    .help-box { background: #eff6ff; border-left: 4px solid var(--accent); padding: 10px 14px; font-size: 14px; margin-bottom: 12px; color: #1e3a8a; }
+    input[type="text"], textarea {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 10px;
+      border: 1px solid #cbd5e0;
+      border-radius: 6px;
+      box-sizing: border-box;
+    }
+
+    .song-card {
+      background: var(--card-bg);
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      cursor: pointer;
+    }
+
+    .song-title { font-weight: bold; font-size: 1.1rem; color: var(--primary); }
+    .song-author { font-size: 0.85rem; color: #718096; }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+      background: #edf2f7;
+      padding: 10px;
+      border-radius: 8px;
+    }
+
+    .song-viewer {
+      background: var(--card-bg);
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      font-family: monospace;
+      font-size: 1.05rem;
+      white-space: pre-wrap;
+      line-height: 1.5;
+    }
+
+    .chord-line { color: var(--chord-color); font-weight: bold; }
+    .text-line { color: var(--text); }
+    .hidden { display: none; }
   </style>
 </head>
 <body>
 
 <div class="container">
   <header>
-    <h1>Cancionero Iglesia de Dios 7d</h1>
-    <p style="margin: 4px 0 0 0; color: #64748b;">Alabanzas con transposición automática</p>
+    <h1>Cancionero ID7D</h1>
+    <button id="btn-add" class="btn" onclick="showForm()">+ Agregar Alabanza</button>
   </header>
 
-  <div class="status-bar">
-    <span id="connection-status">Cargando estado...</span>
-    <span id="pending-sync" style="font-weight: bold; color: #d97706;"></span>
+  <!-- Lista de canciones -->
+  <div id="view-list">
+    <input type="text" id="search-bar" placeholder="Buscar alabanza o autor..." oninput="filterSongs()">
+    <div id="songs-container">Cargando alabanzas desde la nube...</div>
   </div>
 
-  <div id="list-view">
-    <div style="display: flex; gap: 8px; margin-bottom: 12px;">
-      <input type="text" id="search-input" placeholder="Buscar por título, letra o tono..." oninput="filterSongs()" style="margin-bottom: 0;">
-      <button class="btn-main success" onclick="openEditor()">+ Nuevo</button>
+  <!-- Vista de canción -->
+  <div id="view-song" class="hidden">
+    <button class="btn btn-secondary" onclick="showList()">← Volver</button>
+    <button class="btn" onclick="editCurrentSong()">Editar</button>
+    <button class="btn btn-danger" onclick="deleteCurrentSong()">Eliminar</button>
+    
+    <h2 id="display-title" style="margin-top:15px; margin-bottom: 2px;"></h2>
+    <p id="display-author" class="song-author" style="margin-top:0;"></p>
+
+    <div class="controls">
+      <span>Tono: <strong id="current-key">-</strong></span>
+      <button class="btn" onclick="transpose(-1)">- Transponer</button>
+      <button class="btn" onclick="transpose(1)">+ Transponer</button>
+      <button class="btn btn-secondary" onclick="resetTranspose()">Restablecer</button>
     </div>
-    <div id="song-container" class="song-list"></div>
+
+    <div id="display-content" class="song-viewer"></div>
   </div>
 
-  <div id="song-viewer" class="viewer">
-    <button class="btn-main secondary" onclick="showList()">← Volver</button>
-    <h2 id="song-title" style="margin-top:15px; margin-bottom: 5px;"></h2>
-    <p id="song-author" style="color: #64748b; margin-top: 0; font-size: 14px; margin-bottom: 15px;"></p>
-    
-    <div class="lacuerda-bar">
-      <div class="lacuerda-title">Tonalidad: <span id="current-key-display" style="color:#2563eb;"></span></div>
-      <div class="lacuerda-controls">
-        <button class="btn-circle wide" onclick="resetKey()">orig</button>
-        <button class="btn-circle wide accent" id="notation-btn" onclick="toggleNotation()">C»Do</button>
-        <button class="btn-circle" onclick="transpose(2)">+1</button>
-        <button class="btn-circle" onclick="transpose(1)">+½</button>
-        <button class="btn-circle" onclick="transpose(-1)">-½</button>
-        <button class="btn-circle" onclick="transpose(-2)">-1</button>
-      </div>
-    </div>
-
-    <div id="song-content" class="song-lines"></div>
-
-    <div class="admin-menu">
-      <button class="btn-main secondary small" onclick="toggleAdminActions()">⚙️ Opciones</button>
-      <div id="admin-buttons" style="display: none; gap: 8px;">
-        <button class="btn-main secondary small" onclick="editCurrentSong()">✏️ Editar</button>
-        <button class="btn-main danger small" onclick="deleteCurrentSong()">🗑️ Eliminar</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="song-editor" class="editor">
-    <button class="btn-main secondary" onclick="showList()">← Cancelar</button>
-    <h2 id="editor-heading">Agregar Nueva Canción</h2>
-    
-    <div class="help-box">
-      <strong>Escribe o pega tu alabanza con sus acordes.</strong>
-    </div>
-
-    <input type="text" id="edit-title" placeholder="Título de la canción">
-    <input type="text" id="edit-author" placeholder="Autor / Grupo (Opcional)">
-    
-    <!-- Editor interactivo con resaltado de acordes -->
-    <div class="editor-wrapper">
-      <div id="edit-highlight" class="editor-highlight"></div>
-      <textarea id="edit-raw" placeholder="Sol               Do&#10;Señor mi Dios al contemplar los cielos..." oninput="syncEditor()" onscroll="syncScroll()"></textarea>
-    </div>
-
-    <button class="btn-main success" style="width: 100%; padding: 14px; margin-top: 10px;" onclick="saveSong()">Guardar Canción</button>
+  <!-- Formulario de Agregar / Editar -->
+  <div id="view-form" class="hidden">
+    <button class="btn btn-secondary" onclick="showList()">Cancelar</button>
+    <h3 id="form-title">Nueva Alabanza</h3>
+    <input type="text" id="edit-title" placeholder="Título de la alabanza">
+    <input type="text" id="edit-author" placeholder="Autor / Grupo (opcional)">
+    <p style="font-size:0.8rem; color:#718096; margin-top:0;">Escribe los acordes sobre el texto. Ejemplo:<br>C          G<br>Dios es mi refugio</p>
+    <textarea id="edit-raw" rows="12" placeholder="Escribe la letra con acordes aquí..."></textarea>
+    <button class="btn" onclick="saveSong()">Guardar Alabanza</button>
   </div>
 </div>
+
+<!-- SDKs de Firebase desde CDN (Compat) -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
 <script>
-  const DEFAULT_SONGS = [
-    {
-      id: "1",
-      title: "Cuán Grande es Él",
-      author: "Tradicional",
-      originalKey: "G",
-      lines: [
-        { chords: "G                 C", text: "Señor mi Dios, al contemplar los cielos" },
-        { chords: "G                   D", text: "El firmamento y las estrellas ver" },
-        { chords: "G               C", text: "Al oír tu voz en los potentes truenos" },
-        { chords: "G          D          G", text: "Y al ver el sol brillar en su esplendor." }
-      ]
-    }
-  ];
-
-  const scaleA = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-
-  const angloToLatinoMap = {
-    'C': 'Do', 'D': 'Re', 'E': 'Mi', 'F': 'Fa', 'G': 'Sol', 'A': 'La', 'B': 'Si',
-    'C#': 'Do#', 'D#': 'Re#', 'F#': 'Fa#', 'G#': 'Sol#', 'A#': 'La#',
-    'Db': 'Reb', 'Eb': 'Mib', 'Gb': 'Solb', 'Ab': 'Lab', 'Bb': 'Sib'
+  // 1. Configuración de Firebase
+  const firebaseConfig = {
+    apiKey: "AIzaSyDurPYIt-Ds8dKb48wu56fgxy7_8FwKsus",
+    authDomain: "cancionero-iglesia-7560f.firebaseapp.com",
+    projectId: "cancionero-iglesia-7560f",
+    storageBucket: "cancionero-iglesia-7560f.firebasestorage.app",
+    messagingSenderId: "85490280451",
+    appId: "1:85490280451:web:ce95de7717027d1dff8636"
   };
 
-  const latinoToAngloMap = {
-    'DO': 'C', 'RE': 'D', 'MI': 'E', 'FA': 'F', 'SOL': 'G', 'LA': 'A', 'SI': 'B',
-    'DO#': 'C#', 'RE#': 'D#', 'FA#': 'F#', 'SOL#': 'G#', 'LA#': 'A#',
-    'DOB': 'Cb', 'REB': 'Db', 'MIB': 'Eb', 'FAB': 'Fb', 'SOLB': 'Gb', 'LAB': 'Ab', 'SIB': 'Bb'
-  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
+  // Persistencia offline
+  db.enablePersistence().catch(err => console.log("Persistencia offline no disponible:", err.code));
+  const songsCollection = db.collection('songs');
+
+  // Estado de la app
   let songs = [];
   let currentSong = null;
   let editingSongId = null;
-  let currentTransposeSteps = 0;
-  let useLatinoNotation = false;
+  let transposeSteps = 0;
 
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Registrado'));
-  }
+  const chromaticScale = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 
-  function loadLocalSongs() {
-    const saved = localStorage.getItem('church_songs');
-    if (saved) {
-      songs = JSON.parse(saved);
-    } else {
-      songs = DEFAULT_SONGS;
+  // Escuchar la base de datos en tiempo real
+  function listenToSongs() {
+    songsCollection.orderBy('title').onSnapshot(snapshot => {
+      songs = [];
+      snapshot.forEach(doc => {
+        songs.push({ id: doc.id, ...doc.data() });
+      });
       localStorage.setItem('church_songs', JSON.stringify(songs));
-    }
-    renderSongList(songs);
-    updateSyncStatus();
+      renderSongList(songs);
+    }, error => {
+      console.error("Error al obtener datos:", error);
+      const saved = localStorage.getItem('church_songs');
+      if (saved) {
+        songs = JSON.parse(saved);
+        renderSongList(songs);
+      }
+    });
   }
 
-  function updateSyncStatus() {
-    const statusEl = document.getElementById('connection-status');
-    const syncEl = document.getElementById('pending-sync');
-    
-    if (navigator.onLine) {
-      statusEl.innerHTML = '<span class="badge-online">En línea</span>';
-      const pending = JSON.parse(localStorage.getItem('pending_sync') || '[]');
-      syncEl.innerText = pending.length > 0 ? `${pending.length} pendiente(s)` : '';
-    } else {
-      statusEl.innerHTML = '<span class="badge-offline">Modo Offline</span>';
-      const pending = JSON.parse(localStorage.getItem('pending_sync') || '[]');
-      syncEl.innerText = pending.length > 0 ? `${pending.length} por subir` : '';
-    }
-  }
-
-  window.addEventListener('online', updateSyncStatus);
-  window.addEventListener('offline', updateSyncStatus);
-
-  function formatKeyDisplay(key) {
-    if (!key) return 'C';
-    if (!useLatinoNotation) return key;
-    return angloToLatinoMap[key] || key;
-  }
-
-  function renderSongList(items) {
-    const container = document.getElementById('song-container');
+  function renderSongList(list) {
+    const container = document.getElementById('songs-container');
     container.innerHTML = '';
-    items.forEach(song => {
+    
+    if (list.length === 0) {
+      container.innerHTML = '<p>No hay alabanzas registradas aún.</p>';
+      return;
+    }
+
+    list.forEach(song => {
       const card = document.createElement('div');
       card.className = 'song-card';
-      card.onclick = () => openSong(song.id);
+      card.onclick = () => openSong(song);
       card.innerHTML = `
-        <div>
-          <strong>${song.title}</strong>
-          <div style="font-size:12px; color:#64748b;">${song.author || 'Iglesia de Dios 7d'}</div>
-        </div>
-        <span class="badge">${formatKeyDisplay(song.originalKey)}</span>
+        <div class="song-title">${song.title}</div>
+        <div class="song-author">${song.author || 'Iglesia de Dios 7d'}</div>
       `;
       container.appendChild(card);
     });
   }
 
   function filterSongs() {
-    const query = document.getElementById('search-input').value.toLowerCase();
+    const query = document.getElementById('search-bar').value.toLowerCase();
     const filtered = songs.filter(s => 
       s.title.toLowerCase().includes(query) || 
-      (s.author && s.author.toLowerCase().includes(query)) ||
-      s.lines.some(l => l.text.toLowerCase().includes(query) || l.chords.toLowerCase().includes(query))
+      (s.author && s.author.toLowerCase().includes(query))
     );
     renderSongList(filtered);
   }
 
-  const CHORD_REGEX = /^([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?(m|maj|min|dim|aug|sus)?[0-9]?(\/([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?)?$/i;
-
-  function isChordToken(token) {
-    if (!token) return false;
-    return CHORD_REGEX.test(token.trim());
+  function openSong(song) {
+    currentSong = song;
+    transposeSteps = 0;
+    document.getElementById('display-title').innerText = song.title;
+    document.getElementById('display-author').innerText = song.author || 'Iglesia de Dios 7d';
+    renderSongContent();
+    
+    document.getElementById('view-list').classList.add('hidden');
+    document.getElementById('view-song').classList.remove('hidden');
+    document.getElementById('view-form').classList.add('hidden');
   }
 
-  function isChordLine(line) {
-    const tokens = line.trim().split(/\s+/);
-    if (tokens.length === 0 || tokens[0] === "") return false;
-    let chordCount = 0;
-    tokens.forEach(t => { if (isChordToken(t)) chordCount++; });
-    return (chordCount / tokens.length) >= 0.5;
-  }
+  function renderSongContent() {
+    if (!currentSong) return;
+    const container = document.getElementById('display-content');
+    container.innerHTML = '';
 
-  /* Función para sincronizar y resaltar los acordes mientras se escribe */
-  function syncEditor() {
-    const textarea = document.getElementById('edit-raw');
-    const highlight = document.getElementById('edit-highlight');
-    const lines = textarea.value.split('\n');
+    document.getElementById('current-key').innerText = currentSong.originalKey || "N/A";
 
-    const processedLines = lines.map(line => {
-      if (isChordLine(line)) {
-        return line.replace(/([A-ZÑa-z]+[#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-ZÑa-z]+[#b]?)?)/gi, (match) => {
-          if (isChordToken(match)) {
-            return `<span class="highlight-chord">${match}</span>`;
-          }
-          return match;
-        });
+    currentSong.lines.forEach(line => {
+      const lineDiv = document.createElement('div');
+      if (line.isChord) {
+        lineDiv.className = 'chord-line';
+        lineDiv.innerText = transposeLine(line.text, transposeSteps);
+      } else {
+        lineDiv.className = 'text-line';
+        lineDiv.innerText = line.text;
       }
-      return line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      container.appendChild(lineDiv);
     });
-
-    highlight.innerHTML = processedLines.join('\n') + '\n';
   }
 
-  function syncScroll() {
-    const textarea = document.getElementById('edit-raw');
-    const highlight = document.getElementById('edit-highlight');
-    highlight.scrollTop = textarea.scrollTop;
-    highlight.scrollLeft = textarea.scrollLeft;
+  function transposeLine(lineText, steps) {
+    if (steps === 0) return lineText;
+    const chordRegex = /[A-G](b|#)?(m|maj|min|dim|aug|sus)?[0-9]*/g;
+    return lineText.replace(chordRegex, match => {
+      const root = match.match(/[A-G](b|#)?/)[0];
+      const suffix = match.slice(root.length);
+      
+      let index = chromaticScale.indexOf(root);
+      if (index === -1) {
+        if (root === 'Db') index = 1;
+        else if (root === 'Eb') index = 3;
+        else if (root === 'Gb') index = 6;
+        else if (root === 'Ab') index = 8;
+        else if (root === 'Bb') index = 10;
+      }
+
+      if (index === -1) return match;
+
+      let newIndex = (index + steps) % 12;
+      if (newIndex < 0) newIndex += 12;
+
+      return chromaticScale[newIndex] + suffix;
+    });
   }
 
-  function normalizeChordToAnglo(chord) {
-    return chord.replace(/([A-Z]+[#b]?)/gi, (match) => {
-      const upper = match.toUpperCase();
-      return latinoToAngloMap[upper] || match;
-    });
+  function transpose(delta) {
+    transposeSteps += delta;
+    renderSongContent();
+  }
+
+  function resetTranspose() {
+    transposeSteps = 0;
+    renderSongContent();
+  }
+
+  function showList() {
+    currentSong = null;
+    editingSongId = null;
+    document.getElementById('view-list').classList.remove('hidden');
+    document.getElementById('view-song').classList.add('hidden');
+    document.getElementById('view-form').classList.add('hidden');
+  }
+
+  function showForm(song = null) {
+    document.getElementById('view-list').classList.add('hidden');
+    document.getElementById('view-song').classList.add('hidden');
+    document.getElementById('view-form').classList.remove('hidden');
+
+    if (song) {
+      editingSongId = song.id;
+      document.getElementById('form-title').innerText = "Editar Alabanza";
+      document.getElementById('edit-title').value = song.title;
+      document.getElementById('edit-author').value = song.author || '';
+      document.getElementById('edit-raw').value = song.lines.map(l => l.text).join('\n');
+    } else {
+      editingSongId = null;
+      document.getElementById('form-title').innerText = "Nueva Alabanza";
+      document.getElementById('edit-title').value = '';
+      document.getElementById('edit-author').value = '';
+      document.getElementById('edit-raw').value = '';
+    }
+  }
+
+  function editCurrentSong() {
+    if (currentSong) showForm(currentSong);
   }
 
   function parseRawSong(rawText) {
     const rawLines = rawText.split('\n');
-    const parsedLines = [];
-    let detectedKey = "C";
-    let firstChordFound = false;
+    const chordRegex = /^\s*([A-G](b|#)?(m|maj|min|dim|aug|sus)?[0-9]*\s*)+$/;
+    let detectedKey = "N/A";
+    let foundKey = false;
 
-    for (let i = 0; i < rawLines.length; i++) {
-      let current = rawLines[i];
-      if (isChordLine(current)) {
-        current = current.replace(/([A-ZÑa-z]+[#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-ZÑa-z]+[#b]?)?)/gi, (m) => normalizeChordToAnglo(m));
-
-        if (!firstChordFound) {
-          const firstChord = current.trim().split(/\s+/)[0];
-          const match = firstChord.match(/^([A-G][#b]?)/);
-          if (match) detectedKey = match[1];
-          firstChordFound = true;
-        }
-
-        const nextLine = rawLines[i + 1];
-        if (nextLine && !isChordLine(nextLine)) {
-          parsedLines.push({ chords: current, text: nextLine });
-          i++; 
-        } else {
-          parsedLines.push({ chords: current, text: "" });
-        }
-      } else {
-        if (current.trim() !== "") {
-          parsedLines.push({ chords: "", text: current });
+    const lines = rawLines.map(text => {
+      const isChord = chordRegex.test(text);
+      if (isChord && !foundKey) {
+        const firstChord = text.trim().split(/\s+/)[0];
+        if (firstChord) {
+          detectedKey = firstChord;
+          foundKey = true;
         }
       }
-    }
-
-    return { lines: parsedLines, key: detectedKey };
-  }
-
-  function transposeNote(note, steps) {
-    const regex = /^([A-G][#b]?)(.*)/;
-    const match = note.match(regex);
-    if (!match) return note;
-
-    let root = match[1];
-    let suffix = match[2];
-
-    const flats = {'Db':'C#', 'Eb':'D#', 'Gb':'F#', 'Ab':'G#', 'Bb':'A#'};
-    if (flats[root]) root = flats[root];
-
-    let index = scaleA.indexOf(root);
-    if (index === -1) return note;
-
-    let newIndex = (index + steps) % 12;
-    if (newIndex < 0) newIndex += 12;
-
-    return scaleA[newIndex] + suffix;
-  }
-
-  function convertChordNotation(chord, toLatino) {
-    if (!toLatino) return chord;
-    return chord.replace(/([A-G][#b]?)/g, (m) => angloToLatinoMap[m] || m);
-  }
-
-  function convertChordLineNotation(chordLine, toLatino) {
-    if (!toLatino) return chordLine;
-    let result = "";
-    let i = 0;
-
-    const chordRegex = /([A-G][#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-G][#b]?)?)/g;
-    let match;
-
-    while ((match = chordRegex.exec(chordLine)) !== null) {
-      result += chordLine.substring(i, match.index);
-      const originalChord = match[0];
-      const translatedChord = convertChordNotation(originalChord, true);
-      result += translatedChord;
-      i = match.index + originalChord.length;
-    }
-    result += chordLine.substring(i);
-    return result;
-  }
-
-  function transposeChordLine(chordLine, steps) {
-    if (!chordLine) return chordLine;
-
-    let transposed = chordLine;
-    if (steps !== 0) {
-      transposed = chordLine.replace(/([A-G][#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-G][#b]?)?)/g, (match) => {
-        if (match.includes('/')) {
-          const parts = match.split('/');
-          return transposeNote(parts[0], steps) + '/' + transposeNote(parts[1], steps);
-        }
-        return transposeNote(match, steps);
-      });
-    }
-
-    return convertChordLineNotation(transposed, useLatinoNotation);
-  }
-
-  function renderTransposedContent() {
-    const baseKey = transposeNote(currentSong.originalKey, currentTransposeSteps);
-    document.getElementById('current-key-display').innerText = formatKeyDisplay(baseKey);
-
-    const container = document.getElementById('song-content');
-    container.innerHTML = '';
-
-    currentSong.lines.forEach(line => {
-      const block = document.createElement('div');
-      block.className = 'line-block';
-
-      if (line.chords) {
-        const chordDiv = document.createElement('div');
-        chordDiv.className = 'chord-line';
-        chordDiv.innerText = transposeChordLine(line.chords, currentTransposeSteps);
-        block.appendChild(chordDiv);
-      }
-
-      if (line.text) {
-        const textDiv = document.createElement('div');
-        textDiv.className = 'text-line';
-        textDiv.innerText = line.text;
-        block.appendChild(textDiv);
-      }
-
-      container.appendChild(block);
-    });
-  }
-
-  function transpose(steps) { currentTransposeSteps += steps; renderTransposedContent(); }
-  function resetKey() { currentTransposeSteps = 0; renderTransposedContent(); }
-
-  function toggleNotation() {
-    useLatinoNotation = !useLatinoNotation;
-    const btn = document.getElementById('notation-btn');
-    btn.innerText = useLatinoNotation ? "Do»C" : "C»Do";
-    renderTransposedContent();
-    renderSongList(songs);
-  }
-
-  function openSong(id) {
-    currentSong = songs.find(s => s.id === id);
-    currentTransposeSteps = 0;
-    document.getElementById('list-view').style.display = 'none';
-    document.getElementById('song-editor').style.display = 'none';
-    document.getElementById('song-viewer').style.display = 'block';
-    
-    document.getElementById('song-title').innerText = currentSong.title;
-    document.getElementById('song-author').innerText = currentSong.author ? `Por: ${currentSong.author}` : '';
-    document.getElementById('admin-buttons').style.display = 'none';
-    renderTransposedContent();
-  }
-
-  function openEditor() {
-    editingSongId = null;
-    document.getElementById('editor-heading').innerText = "Agregar Nueva Canción";
-    document.getElementById('list-view').style.display = 'none';
-    document.getElementById('song-viewer').style.display = 'none';
-    document.getElementById('song-editor').style.display = 'block';
-    document.getElementById('edit-title').value = '';
-    document.getElementById('edit-author').value = '';
-    document.getElementById('edit-raw').value = '';
-    syncEditor();
-  }
-
-  function showList() {
-    document.getElementById('list-view').style.display = 'block';
-    document.getElementById('song-viewer').style.display = 'none';
-    document.getElementById('song-editor').style.display = 'none';
-  }
-
-  function toggleAdminActions() {
-    const el = document.getElementById('admin-buttons');
-    el.style.display = el.style.display === 'none' ? 'flex' : 'none';
-  }
-
-  function editCurrentSong() {
-    if (!currentSong) return;
-    editingSongId = currentSong.id;
-    document.getElementById('editor-heading').innerText = "Editar Canción";
-    
-    let rawText = "";
-    currentSong.lines.forEach(l => {
-      if (l.chords) rawText += l.chords + "\n";
-      if (l.text) rawText += l.text + "\n";
+      return { text, isChord };
     });
 
-    document.getElementById('edit-title').value = currentSong.title;
-    document.getElementById('edit-author').value = currentSong.author || '';
-    document.getElementById('edit-raw').value = rawText;
-
-    document.getElementById('song-viewer').style.display = 'none';
-    document.getElementById('song-editor').style.display = 'block';
-    syncEditor();
+    return { lines, key: detectedKey };
   }
 
-  function deleteCurrentSong() {
-    if (!currentSong) return;
-    if (confirm(`¿Estás seguro de que deseas eliminar "${currentSong.title}"?`)) {
-      songs = songs.filter(s => s.id !== currentSong.id);
-      localStorage.setItem('church_songs', JSON.stringify(songs));
-      renderSongList(songs);
-      showList();
-    }
-  }
-
-  function saveSong() {
+  async function saveSong() {
     const title = document.getElementById('edit-title').value.trim();
     const author = document.getElementById('edit-author').value.trim();
     const rawText = document.getElementById('edit-raw').value;
 
     if (!title || !rawText.trim()) {
-      alert("Ingresa un título y el contenido.");
+      alert("Ingresa un título y la letra de la alabanza.");
       return;
     }
 
     const { lines, key } = parseRawSong(rawText);
 
-    if (editingSongId) {
-      const idx = songs.findIndex(s => s.id === editingSongId);
-      if (idx !== -1) {
-        songs[idx].title = title;
-        songs[idx].author = author || "Iglesia de Dios 7d";
-        songs[idx].originalKey = key;
-        songs[idx].lines = lines;
-      }
-    } else {
-      const newSong = {
-        id: Date.now().toString(),
-        title: title,
-        author: author || "Iglesia de Dios 7d",
-        originalKey: key,
-        lines: lines
-      };
-      songs.unshift(newSong);
-    }
+    const songData = {
+      title: title,
+      author: author || "Iglesia de Dios 7d",
+      originalKey: key,
+      lines: lines,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
 
-    localStorage.setItem('church_songs', JSON.stringify(songs));
-    renderSongList(songs);
-    showList();
+    try {
+      if (editingSongId) {
+        await songsCollection.doc(editingSongId).update(songData);
+      } else {
+        await songsCollection.add(songData);
+      }
+      showList();
+    } catch (error) {
+      console.error("Error guardando:", error);
+      alert("Hubo un detalle al conectar con la base de datos.");
+    }
   }
 
-  loadLocalSongs();
+  async function deleteCurrentSong() {
+    if (!currentSong) return;
+    if (confirm(`¿Eliminar permanentemente "${currentSong.title}"?`)) {
+      try {
+        await songsCollection.doc(currentSong.id).delete();
+        showList();
+      } catch (error) {
+        console.error("Error al eliminar:", error);
+      }
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    listenToSongs();
+  });
 </script>
+
 </body>
 </html>
