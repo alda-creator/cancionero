@@ -22,6 +22,19 @@
       --chord: #d97706;
       --border: #cbd5e1;
       --danger: #dc2626;
+      --bar-bg: #f1f5f9;
+      --bar-text: #334155;
+    }
+
+    body.dark-mode {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --text: #f8fafc;
+      --chord: #fbbf24;
+      --border: #334155;
+      --primary: #60a5fa;
+      --bar-bg: #334155;
+      --bar-text: #f8fafc;
     }
 
     body {
@@ -30,6 +43,7 @@
       color: var(--text);
       margin: 0;
       padding: 16px;
+      transition: background-color 0.3s, color 0.3s;
     }
 
     .container { max-width: 800px; margin: 0 auto; }
@@ -42,7 +56,7 @@
       align-items: center;
       margin-bottom: 12px;
       padding: 8px 12px;
-      background: #e2e8f0;
+      background: var(--bar-bg);
       border-radius: 6px;
       font-size: 13px;
     }
@@ -59,6 +73,8 @@
       box-sizing: border-box;
       margin-bottom: 12px;
       font-family: inherit;
+      background: var(--card);
+      color: var(--text);
     }
 
     .editor-wrapper {
@@ -67,7 +83,7 @@
       height: 280px;
       border: 2px solid var(--border);
       border-radius: 8px;
-      background: #ffffff;
+      background: var(--card);
       overflow: hidden;
       margin-bottom: 12px;
       box-sizing: border-box;
@@ -123,20 +139,21 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      border: 1px solid var(--border);
     }
 
     .song-card:hover { border-left: 4px solid var(--accent); }
-    .badge { background: #e2e8f0; padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold; }
-    .viewer, .editor { display: none; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .badge { background: var(--bar-bg); color: var(--bar-text); padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+    .viewer, .editor { display: none; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border: 1px solid var(--border); }
 
     .lacuerda-bar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      background: #f1f5f9;
+      background: var(--bar-bg);
       padding: 8px 12px;
       border-radius: 8px;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       border: 1px solid var(--border);
       flex-wrap: wrap;
       gap: 8px;
@@ -144,8 +161,8 @@
 
     .lacuerda-title {
       font-weight: bold;
-      font-size: 15px;
-      color: #334155;
+      font-size: 14px;
+      color: var(--bar-text);
     }
 
     .lacuerda-controls {
@@ -159,8 +176,8 @@
       background: #64748b;
       color: white;
       border: none;
-      width: 38px;
-      height: 38px;
+      width: 36px;
+      height: 36px;
       border-radius: 50%;
       font-weight: bold;
       font-size: 13px;
@@ -172,9 +189,9 @@
       padding: 0;
     }
 
-    .btn-circle:active { background: #334155; transform: scale(0.95); }
-    .btn-circle.accent { background: #2563eb; }
-    .btn-circle.wide { width: auto; padding: 0 10px; border-radius: 20px; }
+    .btn-circle:active { transform: scale(0.95); }
+    .btn-circle.accent { background: var(--accent); }
+    .btn-circle.wide { width: auto; padding: 0 10px; border-radius: 18px; }
 
     .admin-menu {
       margin-top: 25px;
@@ -201,19 +218,27 @@
     button.danger { background: var(--danger); }
     button.small { padding: 6px 10px; font-size: 12px; }
 
-    .song-lines { font-family: "Courier New", Courier, monospace; font-size: 16px; line-height: 1.5; }
+    .song-lines { 
+      font-family: "Courier New", Courier, monospace; 
+      font-size: 16px; 
+      line-height: 1.5; 
+      padding-bottom: 60px; /* Espacio para scroll continuo */
+    }
     .line-block { margin-bottom: 12px; }
     .chord-line { color: var(--chord); font-weight: bold; min-height: 1.2em; white-space: pre; }
     .text-line { white-space: pre-wrap; }
-    .help-box { background: #eff6ff; border-left: 4px solid var(--accent); padding: 10px 14px; font-size: 14px; margin-bottom: 12px; color: #1e3a8a; }
+    .help-box { background: var(--bar-bg); border-left: 4px solid var(--accent); padding: 10px 14px; font-size: 14px; margin-bottom: 12px; color: var(--text); }
   </style>
 </head>
 <body>
 
 <div class="container">
-  <header>
-    <h1>Cancionero Iglesia de Dios 7d</h1>
-    <p style="margin: 4px 0 0 0; color: #64748b;">Alabanzas con transposición automática</p>
+  <header style="display: flex; justify-content: space-between; align-items: center;">
+    <div style="text-align: left;">
+      <h1>Cancionero Iglesia de Dios 7d</h1>
+      <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Alabanzas con transposición</p>
+    </div>
+    <button class="btn-circle" onclick="toggleDarkMode()" id="dark-mode-btn" title="Modo Oscuro">🌙</button>
   </header>
 
   <div class="status-bar">
@@ -230,12 +255,22 @@
   </div>
 
   <div id="song-viewer" class="viewer">
-    <button class="btn-main secondary" onclick="showList()">← Volver</button>
-    <h2 id="song-title" style="margin-top:15px; margin-bottom: 5px;"></h2>
-    <p id="song-author" style="color: #64748b; margin-top: 0; font-size: 14px; margin-bottom: 15px;"></p>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+      <button class="btn-main secondary" onclick="showList()">← Volver</button>
+      
+      <!-- Controles de Tamaño de Letra -->
+      <div style="display: flex; gap: 4px;">
+        <button class="btn-circle small" onclick="changeFontSize(-1)">A-</button>
+        <button class="btn-circle small" onclick="changeFontSize(1)">A+</button>
+      </div>
+    </div>
+
+    <h2 id="song-title" style="margin-top:10px; margin-bottom: 2px;"></h2>
+    <p id="song-author" style="color: #64748b; margin-top: 0; font-size: 14px; margin-bottom: 12px;"></p>
     
+    <!-- Barra 1: Transposición y Tonalidad -->
     <div class="lacuerda-bar">
-      <div class="lacuerda-title">Tonalidad: <span id="current-key-display" style="color:#2563eb;"></span></div>
+      <div class="lacuerda-title">Tono: <span id="current-key-display" style="color:var(--accent);"></span></div>
       <div class="lacuerda-controls">
         <button class="btn-circle wide" onclick="resetKey()">orig</button>
         <button class="btn-circle wide accent" id="notation-btn" onclick="toggleNotation()">C»Do</button>
@@ -243,6 +278,17 @@
         <button class="btn-circle" onclick="transpose(1)">+½</button>
         <button class="btn-circle" onclick="transpose(-1)">-½</button>
         <button class="btn-circle" onclick="transpose(-2)">-1</button>
+      </div>
+    </div>
+
+    <!-- Barra 2: Auto-Scroll -->
+    <div class="lacuerda-bar">
+      <div class="lacuerda-title">Auto-Scroll</div>
+      <div class="lacuerda-controls">
+        <button class="btn-circle wide accent" id="scroll-toggle-btn" onclick="toggleAutoScroll()">▶ Rodar</button>
+        <button class="btn-circle" onclick="changeScrollSpeed(-1)">-</button>
+        <span id="scroll-speed-display" style="font-size: 13px; font-weight: bold; width: 28px; text-align: center;">1x</span>
+        <button class="btn-circle" onclick="changeScrollSpeed(1)">+</button>
       </div>
     </div>
 
@@ -326,6 +372,12 @@
   let currentTransposeSteps = 0;
   let useLatinoNotation = false;
 
+  // Variables para Auto-Scroll y Fuente
+  let scrollInterval = null;
+  let isScrolling = false;
+  let scrollSpeed = 1; // 1x, 2x, 3x...
+  let currentFontSize = 16;
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Registrado')).catch(() => {});
   }
@@ -374,6 +426,71 @@
 
   window.addEventListener('online', updateSyncStatus);
   window.addEventListener('offline', updateSyncStatus);
+
+  /* MODO OSCURO */
+  function toggleDarkMode() {
+    document.body.classList.toggle('dark-mode');
+    const isDark = document.body.classList.contains('dark-mode');
+    document.getElementById('dark-mode-btn').innerText = isDark ? '☀️' : '🌙';
+    localStorage.setItem('dark_mode', isDark ? 'true' : 'false');
+  }
+
+  // Cargar preferencia de Modo Oscuro al inicio
+  if (localStorage.getItem('dark_mode') === 'true') {
+    document.body.classList.add('dark-mode');
+    setTimeout(() => {
+      const btn = document.getElementById('dark-mode-btn');
+      if (btn) btn.innerText = '☀️';
+    }, 100);
+  }
+
+  /* TAMAÑO DE LETRA */
+  function changeFontSize(delta) {
+    currentFontSize = Math.max(12, Math.min(28, currentFontSize + delta));
+    document.getElementById('song-content').style.fontSize = currentFontSize + 'px';
+  }
+
+  /* AUTO-SCROLL */
+  function toggleAutoScroll() {
+    if (isScrolling) {
+      stopAutoScroll();
+    } else {
+      startAutoScroll();
+    }
+  }
+
+  function startAutoScroll() {
+    stopAutoScroll();
+    isScrolling = true;
+    document.getElementById('scroll-toggle-btn').innerText = "⏸ Pausa";
+    document.getElementById('scroll-toggle-btn').style.background = "#dc2626";
+
+    const delay = Math.max(10, 50 - (scrollSpeed * 8));
+    scrollInterval = setInterval(() => {
+      window.scrollBy(0, 1);
+      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 10) {
+        stopAutoScroll(); // Detener al llegar al final
+      }
+    }, delay);
+  }
+
+  function stopAutoScroll() {
+    isScrolling = false;
+    if (scrollInterval) clearInterval(scrollInterval);
+    const btn = document.getElementById('scroll-toggle-btn');
+    if (btn) {
+      btn.innerText = "▶ Rodar";
+      btn.style.background = "var(--accent)";
+    }
+  }
+
+  function changeScrollSpeed(delta) {
+    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));
+    document.getElementById('scroll-speed-display').innerText = scrollSpeed + 'x';
+    if (isScrolling) {
+      startAutoScroll(); // Reiniciar intervalo con nueva velocidad
+    }
+  }
 
   function formatKeyDisplay(key) {
     if (!key) return 'C';
@@ -601,6 +718,7 @@
   }
 
   function openSong(id) {
+    stopAutoScroll();
     currentSong = songs.find(s => s.id === id);
     if (!currentSong) return;
     currentTransposeSteps = 0;
@@ -611,10 +729,16 @@
     document.getElementById('song-title').innerText = currentSong.title;
     document.getElementById('song-author').innerText = currentSong.author ? `Por: ${currentSong.author}` : '';
     document.getElementById('admin-buttons').style.display = 'none';
+    
+    // Resetear estilo de letra
+    document.getElementById('song-content').style.fontSize = currentFontSize + 'px';
+    
     renderTransposedContent();
+    window.scrollTo(0, 0);
   }
 
   function openEditor() {
+    stopAutoScroll();
     editingSongId = null;
     document.getElementById('editor-heading').innerText = "Agregar Nueva Canción";
     document.getElementById('list-view').style.display = 'none';
@@ -627,6 +751,7 @@
   }
 
   function showList() {
+    stopAutoScroll();
     document.getElementById('list-view').style.display = 'block';
     document.getElementById('song-viewer').style.display = 'none';
     document.getElementById('song-editor').style.display = 'none';
@@ -639,6 +764,7 @@
 
   function editCurrentSong() {
     if (!currentSong) return;
+    stopAutoScroll();
     editingSongId = currentSong.id;
     document.getElementById('editor-heading').innerText = "Editar Canción";
     
