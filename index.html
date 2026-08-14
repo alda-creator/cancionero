@@ -46,6 +46,16 @@
       transition: background-color 0.3s, color 0.3s;
     }
 
+    body.fullscreen-mode {
+      padding: 8px !important;
+    }
+
+    body.fullscreen-mode header,
+    body.fullscreen-mode .status-bar,
+    body.fullscreen-mode .admin-menu {
+      display: none !important;
+    }
+
     .container { max-width: 800px; margin: 0 auto; }
     header { text-align: center; margin-bottom: 20px; }
     h1 { margin: 0 0 4px 0; color: var(--primary); font-size: 24px; }
@@ -123,10 +133,7 @@
       color: var(--text);
     }
 
-    .highlight-chord {
-      color: var(--chord);
-      font-weight: bold;
-    }
+    .highlight-chord { color: var(--chord); font-weight: bold; }
 
     .song-list { display: flex; flex-direction: column; gap: 10px; }
 
@@ -135,15 +142,32 @@
       padding: 14px 18px;
       border-radius: 8px;
       box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      cursor: pointer;
       display: flex;
       justify-content: space-between;
       align-items: center;
       border: 1px solid var(--border);
     }
 
+    .song-card-info {
+      cursor: pointer;
+      flex-grow: 1;
+    }
+
     .song-card:hover { border-left: 4px solid var(--accent); }
     .badge { background: var(--bar-bg); color: var(--bar-text); padding: 4px 8px; border-radius: 4px; font-size: 14px; font-weight: bold; }
+    
+    .btn-set {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      margin-left: 10px;
+    }
+    .btn-set.active { background: #f59e0b; color: white; border-color: #d97706; }
+
     .viewer, .editor { display: none; background: var(--card); padding: 20px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); border: 1px solid var(--border); }
 
     .lacuerda-bar {
@@ -159,18 +183,8 @@
       gap: 8px;
     }
 
-    .lacuerda-title {
-      font-weight: bold;
-      font-size: 14px;
-      color: var(--bar-text);
-    }
-
-    .lacuerda-controls {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      overflow-x: auto;
-    }
+    .lacuerda-title { font-weight: bold; font-size: 14px; color: var(--bar-text); }
+    .lacuerda-controls { display: flex; align-items: center; gap: 6px; overflow-x: auto; }
 
     .btn-circle {
       background: #64748b;
@@ -218,34 +232,47 @@
     button.danger { background: var(--danger); }
     button.small { padding: 6px 10px; font-size: 12px; }
 
-    /* FIX: Garantiza que las líneas largas no desalineen la música ni desborden la tarjeta */
     .song-lines { 
       font-family: "Courier New", Courier, monospace; 
       font-size: 16px; 
       line-height: 1.5; 
-      padding-bottom: 20px; /* Ajuste del punto 1: Espacio suficiente pero sin excesos */
-      overflow-x: auto; /* Permite scroll horizontal interno si la frase es muy larga */
+      padding-bottom: 20px;
+      overflow-x: auto;
       width: 100%;
       box-sizing: border-box;
     }
 
     .line-block { 
       margin-bottom: 12px;
-      min-width: max-content; /* Mantiene acordes y letra perfectamente alineados sin cortar */
+      min-width: max-content;
     }
 
-    .chord-line { 
-      color: var(--chord); 
-      font-weight: bold; 
-      min-height: 1.2em; 
-      white-space: pre; 
-    }
-
-    .text-line { 
-      white-space: pre; /* Evita que la letra salte sola de renglón y descalibre la nota superior */
-    }
+    .chord-line { color: var(--chord); font-weight: bold; min-height: 1.2em; white-space: pre; }
+    .text-line { white-space: pre; }
 
     .help-box { background: var(--bar-bg); border-left: 4px solid var(--accent); padding: 10px 14px; font-size: 14px; margin-bottom: 12px; color: var(--text); }
+    
+    .tabs-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      flex: 1;
+      padding: 10px;
+      background: var(--bar-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-weight: bold;
+      cursor: pointer;
+      text-align: center;
+    }
+    .tab-btn.active {
+      background: var(--accent);
+      color: white;
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
@@ -265,6 +292,11 @@
   </div>
 
   <div id="list-view">
+    <div class="tabs-bar">
+      <button class="tab-btn active" id="tab-all" onclick="switchTab('all')">Todas</button>
+      <button class="tab-btn" id="tab-set" onclick="switchTab('set')">⭐ Mi Set (<span id="set-count">0</span>)</button>
+    </div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 12px;">
       <input type="text" id="search-input" placeholder="Buscar por título, letra o tono..." oninput="filterSongs()" style="margin-bottom: 0;">
       <button class="btn-main success" onclick="openEditor()">+ Nuevo</button>
@@ -273,11 +305,11 @@
   </div>
 
   <div id="song-viewer" class="viewer">
-    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 8px;">
       <button class="btn-main secondary" onclick="showList()">← Volver</button>
       
-      <!-- Controles de Tamaño de Letra -->
-      <div style="display: flex; gap: 4px;">
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <button class="btn-main small secondary" onclick="toggleFullscreenView()" id="fullscreen-btn">📱 En Vivo</button>
         <button class="btn-circle small" onclick="changeFontSize(-1)">A-</button>
         <button class="btn-circle small" onclick="changeFontSize(1)">A+</button>
       </div>
@@ -337,7 +369,7 @@
       <textarea id="edit-raw" placeholder="Sol               Do&#10;Señor mi Dios al contemplar los cielos..." oninput="syncEditor()" onscroll="syncScroll()"></textarea>
     </div>
 
-    <button class="btn-main success" style="width: 100%; padding: 14px; margin-top: 10px;" onclick="saveSong()">Guardar Canción</button>
+    <button class="btn-main success" id="btn-save" style="width: 100%; padding: 14px; margin-top: 10px;" onclick="saveSong()">Guardar Canción</button>
   </div>
 </div>
 
@@ -385,16 +417,19 @@
   };
 
   let songs = [];
+  let songSetIds = JSON.parse(localStorage.getItem('church_song_set') || '[]');
+  let currentTab = 'all';
+
   let currentSong = null;
   let editingSongId = null;
   let currentTransposeSteps = 0;
   let useLatinoNotation = false;
 
-  // Variables para Auto-Scroll y Fuente
   let scrollInterval = null;
   let isScrolling = false;
   let scrollSpeed = 1; 
   let currentFontSize = 16;
+  let isFullscreen = false;
 
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js').then(() => console.log('Service Worker Registrado')).catch(() => {});
@@ -411,9 +446,8 @@
         });
         localStorage.setItem('church_songs', JSON.stringify(songs));
         
-        // Optimización del punto 2: Solo redibuja la lista si la vista de lista está activa
         if (document.getElementById('list-view').style.display !== 'none') {
-          renderSongList(songs);
+          renderCurrentTab();
         }
         updateSyncStatus();
       }, error => {
@@ -429,7 +463,7 @@
     const saved = localStorage.getItem('church_songs');
     if (saved) {
       songs = JSON.parse(saved);
-      renderSongList(songs);
+      renderCurrentTab();
     }
   }
 
@@ -449,7 +483,63 @@
   window.addEventListener('online', updateSyncStatus);
   window.addEventListener('offline', updateSyncStatus);
 
-  /* MODO OSCURO */
+  /* MODO EN VIVO / PANTALLA COMPLETA */
+  function toggleFullscreenView() {
+    isFullscreen = !isFullscreen;
+    const btn = document.getElementById('fullscreen-btn');
+    if (isFullscreen) {
+      document.body.classList.add('fullscreen-mode');
+      btn.innerText = "✖ Salir Vivo";
+      btn.style.background = "#dc2626";
+    } else {
+      document.body.classList.remove('fullscreen-mode');
+      btn.innerText = "📱 En Vivo";
+      btn.style.background = "#64748b";
+    }
+  }
+
+  /* GESTIÓN DE SETS / LISTAS DE CANTO */
+  function switchTab(tab) {
+    currentTab = tab;
+    document.getElementById('tab-all').classList.toggle('active', tab === 'all');
+    document.getElementById('tab-set').classList.toggle('active', tab === 'set');
+    renderCurrentTab();
+  }
+
+  function toggleSetItem(e, id) {
+    e.stopPropagation();
+    if (songSetIds.includes(id)) {
+      songSetIds = songSetIds.filter(item => item !== id);
+    } else {
+      songSetIds.push(id);
+    }
+    localStorage.setItem('church_song_set', JSON.stringify(songSetIds));
+    renderCurrentTab();
+  }
+
+  function renderCurrentTab() {
+    document.getElementById('set-count').innerText = songSetIds.length;
+    let listToRender = songs;
+
+    if (currentTab === 'set') {
+      listToRender = songs.filter(s => songSetIds.includes(s.id));
+    }
+
+    const query = document.getElementById('search-input').value.toLowerCase();
+    if (query) {
+      listToRender = listToRender.filter(s => 
+        s.title.toLowerCase().includes(query) || 
+        (s.author && s.author.toLowerCase().includes(query)) ||
+        (s.lines && s.lines.some(l => 
+          (l.text && l.text.toLowerCase().includes(query)) || 
+          (l.chords && l.chords.toLowerCase().includes(query))
+        ))
+      );
+    }
+
+    renderSongList(listToRender);
+  }
+
   function toggleDarkMode() {
     document.body.classList.toggle('dark-mode');
     const isDark = document.body.classList.contains('dark-mode');
@@ -465,13 +555,11 @@
     }, 100);
   }
 
-  /* TAMAÑO DE LETRA */
   function changeFontSize(delta) {
     currentFontSize = Math.max(12, Math.min(28, currentFontSize + delta));
     document.getElementById('song-content').style.fontSize = currentFontSize + 'px';
   }
 
-  /* AUTO-SCROLL */
   function toggleAutoScroll() {
     if (isScrolling) {
       stopAutoScroll();
@@ -522,32 +610,36 @@
   function renderSongList(items) {
     const container = document.getElementById('song-container');
     container.innerHTML = '';
+    
+    if (items.length === 0) {
+      container.innerHTML = `<div style="text-align:center; padding: 20px; color: #64748b;">No hay canciones en esta lista.</div>`;
+      return;
+    }
+
     items.forEach(song => {
       const card = document.createElement('div');
       card.className = 'song-card';
-      card.onclick = () => openSong(song.id);
+      
+      const inSet = songSetIds.includes(song.id);
+
       card.innerHTML = `
-        <div>
+        <div class="song-card-info" onclick="openSong('${song.id}')">
           <strong>${song.title}</strong>
           <div style="font-size:12px; color:#64748b;">${song.author || 'Iglesia de Dios 7d'}</div>
         </div>
-        <span class="badge">${formatKeyDisplay(song.originalKey)}</span>
+        <div style="display:flex; align-items:center;">
+          <span class="badge">${formatKeyDisplay(song.originalKey)}</span>
+          <button class="btn-set ${inSet ? 'active' : ''}" onclick="toggleSetItem(event, '${song.id}')">
+            ${inSet ? '★ En Set' : '☆ Mi Set'}
+          </button>
+        </div>
       `;
       container.appendChild(card);
     });
   }
 
   function filterSongs() {
-    const query = document.getElementById('search-input').value.toLowerCase();
-    const filtered = songs.filter(s => 
-      s.title.toLowerCase().includes(query) || 
-      (s.author && s.author.toLowerCase().includes(query)) ||
-      (s.lines && s.lines.some(l => 
-        (l.text && l.text.toLowerCase().includes(query)) || 
-        (l.chords && l.chords.toLowerCase().includes(query))
-      ))
-    );
-    renderSongList(filtered);
+    renderCurrentTab();
   }
 
   const CHORD_REGEX = /^([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?(m|maj|min|dim|aug|sus)?[0-9]?(\/([A-G]|DO|RE|MI|FA|SOL|LA|SI)[#b]?)?$/i;
@@ -736,7 +828,7 @@
     btn.innerText = useLatinoNotation ? "Do»C" : "C»Do";
     renderTransposedContent();
     if (document.getElementById('list-view').style.display !== 'none') {
-      renderSongList(songs);
+      renderCurrentTab();
     }
   }
 
@@ -774,10 +866,11 @@
 
   function showList() {
     stopAutoScroll();
+    if (isFullscreen) toggleFullscreenView();
     document.getElementById('list-view').style.display = 'block';
     document.getElementById('song-viewer').style.display = 'none';
     document.getElementById('song-editor').style.display = 'none';
-    renderSongList(songs);
+    renderCurrentTab();
   }
 
   function toggleAdminActions() {
@@ -811,21 +904,24 @@
   async function deleteCurrentSong() {
     if (!currentSong) return;
     if (confirm(`¿Estás seguro de que deseas eliminar "${currentSong.title}"?`)) {
-      try {
-        if (songsCollection) {
-          await songsCollection.doc(currentSong.id).delete();
-        }
-        songs = songs.filter(s => s.id !== currentSong.id);
-        localStorage.setItem('church_songs', JSON.stringify(songs));
-        renderSongList(songs);
-        showList();
-      } catch (err) {
-        console.error("Error al eliminar:", err);
+      const deleteId = currentSong.id;
+      
+      // Eliminación local inmediata
+      songs = songs.filter(s => s.id !== deleteId);
+      songSetIds = songSetIds.filter(id => id !== deleteId);
+      localStorage.setItem('church_songs', JSON.stringify(songs));
+      localStorage.setItem('church_song_set', JSON.stringify(songSetIds));
+      showList();
+
+      // Eliminación remota sin bloquear
+      if (songsCollection && !deleteId.startsWith('local_')) {
+        songsCollection.doc(deleteId).delete().catch(err => console.error("Error al eliminar remoto:", err));
       }
     }
   }
 
-  async function saveSong() {
+  /* FIX OFFLINE: Guardado instantáneo sin promesas que congelen la interfaz */
+  function saveSong() {
     const title = document.getElementById('edit-title').value.trim();
     const author = document.getElementById('edit-author').value.trim();
     const rawText = document.getElementById('edit-raw').value;
@@ -836,8 +932,8 @@
     }
 
     const { lines, key } = parseRawSong(rawText);
-
     const newId = editingSongId || ('local_' + Date.now());
+
     const songData = {
       id: newId,
       title: title,
@@ -846,30 +942,7 @@
       lines: lines
     };
 
-    try {
-      if (songsCollection) {
-        if (editingSongId && !editingSongId.startsWith('local_')) {
-          await songsCollection.doc(editingSongId).update({
-            title: songData.title,
-            author: songData.author,
-            originalKey: songData.originalKey,
-            lines: songData.lines,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        } else {
-          await songsCollection.add({
-            title: songData.title,
-            author: songData.author,
-            originalKey: songData.originalKey,
-            lines: songData.lines,
-            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-          });
-        }
-      }
-    } catch (err) {
-      console.error("Error al guardar en Firebase, se mantendrá copia local:", err);
-    }
-
+    // 1. Guardar de inmediato en la memoria local
     const index = songs.findIndex(s => s.id === newId);
     if (index >= 0) {
       songs[index] = songData;
@@ -877,8 +950,30 @@
       songs.push(songData);
     }
     localStorage.setItem('church_songs', JSON.stringify(songs));
-    renderSongList(songs);
+
+    // 2. Regresar inmediatamente a la pantalla principal (Evita duplicados)
     showList();
+
+    // 3. Intentar sincronizar con Firebase en segundo plano sin bloquar
+    if (songsCollection) {
+      if (editingSongId && !editingSongId.startsWith('local_')) {
+        songsCollection.doc(editingSongId).update({
+          title: songData.title,
+          author: songData.author,
+          originalKey: songData.originalKey,
+          lines: songData.lines,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(err => console.warn("Sincronización diferida (Offline):", err));
+      } else {
+        songsCollection.add({
+          title: songData.title,
+          author: songData.author,
+          originalKey: songData.originalKey,
+          lines: songData.lines,
+          updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+        }).catch(err => console.warn("Sincronización diferida (Offline):", err));
+      }
+    }
   }
 
   document.addEventListener('DOMContentLoaded', () => {
