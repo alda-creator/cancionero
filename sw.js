@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cancionero-v8';
+const CACHE_NAME = 'cancionero-v9';
 
 // Lista completa de archivos de la app + dependencias externas (Firebase y fuentes)
 const urlsToCache = [
