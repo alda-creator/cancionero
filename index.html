@@ -218,15 +218,33 @@
     button.danger { background: var(--danger); }
     button.small { padding: 6px 10px; font-size: 12px; }
 
+    /* FIX: Garantiza que las líneas largas no desalineen la música ni desborden la tarjeta */
     .song-lines { 
       font-family: "Courier New", Courier, monospace; 
       font-size: 16px; 
       line-height: 1.5; 
-      padding-bottom: 60px; /* Espacio para scroll continuo */
+      padding-bottom: 20px; /* Ajuste del punto 1: Espacio suficiente pero sin excesos */
+      overflow-x: auto; /* Permite scroll horizontal interno si la frase es muy larga */
+      width: 100%;
+      box-sizing: border-box;
     }
-    .line-block { margin-bottom: 12px; }
-    .chord-line { color: var(--chord); font-weight: bold; min-height: 1.2em; white-space: pre; }
-    .text-line { white-space: pre-wrap; }
+
+    .line-block { 
+      margin-bottom: 12px;
+      min-width: max-content; /* Mantiene acordes y letra perfectamente alineados sin cortar */
+    }
+
+    .chord-line { 
+      color: var(--chord); 
+      font-weight: bold; 
+      min-height: 1.2em; 
+      white-space: pre; 
+    }
+
+    .text-line { 
+      white-space: pre; /* Evita que la letra salte sola de renglón y descalibre la nota superior */
+    }
+
     .help-box { background: var(--bar-bg); border-left: 4px solid var(--accent); padding: 10px 14px; font-size: 14px; margin-bottom: 12px; color: var(--text); }
   </style>
 </head>
@@ -375,7 +393,7 @@
   // Variables para Auto-Scroll y Fuente
   let scrollInterval = null;
   let isScrolling = false;
-  let scrollSpeed = 1; // 1x, 2x, 3x...
+  let scrollSpeed = 1; 
   let currentFontSize = 16;
 
   if ('serviceWorker' in navigator) {
@@ -392,7 +410,11 @@
           songs.push({ id: doc.id, ...doc.data() });
         });
         localStorage.setItem('church_songs', JSON.stringify(songs));
-        renderSongList(songs);
+        
+        // Optimización del punto 2: Solo redibuja la lista si la vista de lista está activa
+        if (document.getElementById('list-view').style.display !== 'none') {
+          renderSongList(songs);
+        }
         updateSyncStatus();
       }, error => {
         console.error("Error al obtener datos en tiempo real:", error);
@@ -435,7 +457,6 @@
     localStorage.setItem('dark_mode', isDark ? 'true' : 'false');
   }
 
-  // Cargar preferencia de Modo Oscuro al inicio
   if (localStorage.getItem('dark_mode') === 'true') {
     document.body.classList.add('dark-mode');
     setTimeout(() => {
@@ -469,7 +490,7 @@
     scrollInterval = setInterval(() => {
       window.scrollBy(0, 1);
       if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 10) {
-        stopAutoScroll(); // Detener al llegar al final
+        stopAutoScroll(); 
       }
     }, delay);
   }
@@ -488,7 +509,7 @@
     scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));
     document.getElementById('scroll-speed-display').innerText = scrollSpeed + 'x';
     if (isScrolling) {
-      startAutoScroll(); // Reiniciar intervalo con nueva velocidad
+      startAutoScroll(); 
     }
   }
 
@@ -714,7 +735,9 @@
     const btn = document.getElementById('notation-btn');
     btn.innerText = useLatinoNotation ? "Do»C" : "C»Do";
     renderTransposedContent();
-    renderSongList(songs);
+    if (document.getElementById('list-view').style.display !== 'none') {
+      renderSongList(songs);
+    }
   }
 
   function openSong(id) {
@@ -730,7 +753,6 @@
     document.getElementById('song-author').innerText = currentSong.author ? `Por: ${currentSong.author}` : '';
     document.getElementById('admin-buttons').style.display = 'none';
     
-    // Resetear estilo de letra
     document.getElementById('song-content').style.fontSize = currentFontSize + 'px';
     
     renderTransposedContent();
@@ -755,6 +777,7 @@
     document.getElementById('list-view').style.display = 'block';
     document.getElementById('song-viewer').style.display = 'none';
     document.getElementById('song-editor').style.display = 'none';
+    renderSongList(songs);
   }
 
   function toggleAdminActions() {
