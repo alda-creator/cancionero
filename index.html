@@ -189,7 +189,6 @@
 
     .btn-action.primary { background: var(--accent); color: white; border: none; }  
 
-    /* BLOQUES */
     .song-block {
       background: var(--block-bg);
       border: 1px solid var(--card-border);
@@ -238,7 +237,6 @@
       margin-top: 10px;
     }
 
-    /* EDITOR */
     .editor-container {
       position: relative;
       width: 100%;
@@ -301,7 +299,6 @@
       cursor: pointer;
     }
 
-    /* PANTALLA EN VIVO COMPLETA */
     .live-screen {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -335,7 +332,6 @@
 
 <div class="container">  
   
-  <!-- VISTA LISTA -->  
   <div id="list-view">  
     <header>  
       <div>
@@ -363,7 +359,6 @@
     <div id="song-container" class="song-list"></div>  
   </div>  
 
-  <!-- VISTA VISOR -->  
   <div id="song-viewer" class="viewer">  
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">  
       <button class="btn-action" onclick="showList()">← Volver</button>  
@@ -381,7 +376,6 @@
       </div>  
     </div>  
 
-    <!-- Controls -->  
     <div class="controls-bar">  
       <span style="font-size: 13px; font-weight: 600;">Transponer:</span>  
       <div style="display: flex; gap: 4px;">  
@@ -415,7 +409,6 @@
     </div>
   </div>  
 
-  <!-- VISTA EDITOR -->  
   <div id="song-editor" class="editor">  
     <button class="btn-action" onclick="showList()" style="margin-bottom: 12px;">← Cancelar</button>  
     <h2 id="editor-heading" style="margin-top:0;">Agregar Nueva Canción</h2>  
@@ -423,7 +416,6 @@
     <input type="text" class="search-bar" id="edit-title" placeholder="Título de la canción">  
     <input type="text" class="search-bar" id="edit-author" placeholder="Autor / Grupo (Opcional)">  
 
-    <!-- Botones rápidos de bloques -->
     <div class="quick-tags">
       <span style="font-size:12px; color:var(--text-muted); align-self:center;">Insertar Bloque:</span>
       <button class="tag-btn" onclick="insertTag('[ESTROFA 1]')">+ Estrofa 1</button>
@@ -442,7 +434,6 @@
 
 </div>  
 
-<!-- VISTA EN VIVO -->
 <div id="live-screen" class="live-screen" style="display:none;">
   <div class="live-header">
     <button class="btn-action" onclick="closeLiveView()">← Salir de En Vivo</button>
@@ -563,7 +554,7 @@
       listToRender = listToRender.filter(s =>   
         s.title.toLowerCase().includes(query) ||   
         (s.author && s.author.toLowerCase().includes(query)) ||  
-        (s.rawText && s.rawText.toLowerCase().includes(query))  
+        (getSongRawText(s) && getSongRawText(s).toLowerCase().includes(query))  
       );  
     }  
     renderSongList(listToRender);  
@@ -619,14 +610,30 @@
     return chord.replace(/([A-Z]+[#b]?)/gi, (m) => latinoToAngloMap[m.toUpperCase()] || m);  
   }  
 
-  /* PARSER CON BLOQUES ESTRUCTURADOS */
+  // COMPATIBILIDAD CON ESTRUCTURA ANTERIOR
+  function getSongRawText(song) {
+    if (!song) return "";
+    if (song.rawText) return song.rawText;
+    if (song.lyrics) {
+      if (typeof song.lyrics === 'string') return song.lyrics;
+      if (Array.isArray(song.lyrics)) {
+        return song.lyrics.map(line => {
+          if (typeof line === 'string') return line;
+          return `${line.chords || ''}\n${line.text || ''}`;
+        }).join('\n');
+      }
+    }
+    return "";
+  }
+
+  /* PARSER CON SOPORTE PARA CANCIONES NUEVAS Y VIEJAS */
   function parseRawSongWithBlocks(rawText) {
+    if (!rawText) return { blocks: [], key: "C" };
     const rawLines = rawText.split('\n');
     const blocks = [];
     let currentBlock = { label: "ESTROFA 1", lines: [] };
     let detectedKey = "C";
     let firstChordFound = false;
-    let autoBlockCount = 1;
 
     for (let i = 0; i < rawLines.length; i++) {
       let line = rawLines[i];
@@ -698,7 +705,8 @@
     if (!currentSong) return;
     targetContainer.innerHTML = '';
 
-    const parsed = parseRawSongWithBlocks(currentSong.rawText || "");
+    const rawText = getSongRawText(currentSong);
+    const parsed = parseRawSongWithBlocks(rawText);
     
     parsed.blocks.forEach(block => {
       const blockDiv = document.createElement('div');
@@ -836,7 +844,7 @@
     document.getElementById('editor-heading').innerText = "Editar Canción";  
     document.getElementById('edit-title').value = currentSong.title;  
     document.getElementById('edit-author').value = currentSong.author || '';  
-    document.getElementById('edit-raw').value = currentSong.rawText || "";  
+    document.getElementById('edit-raw').value = getSongRawText(currentSong);  
     document.getElementById('song-viewer').style.display = 'none';  
     document.getElementById('song-editor').style.display = 'block';  
     handleEditorInput();
@@ -872,7 +880,7 @@
     showList();  
     if (songsCollection) {  
       if (editingSongId && !editingSongId.startsWith('local_')) {  
-        songsCollection.doc(editingSongId).update(songData);  
+        songsCollection.doc(editingSongId).set(songData, { merge: true });  
       } else {  
         songsCollection.add(songData);  
       }  
