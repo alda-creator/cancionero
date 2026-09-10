@@ -416,6 +416,14 @@
     <input type="text" class="search-bar" id="edit-title" placeholder="Título de la canción">  
     <input type="text" class="search-bar" id="edit-author" placeholder="Autor / Grupo (Opcional)">  
 
+    <!-- REVISOR DE CAMPOS ANTIGUOS DE FIREBASE -->
+    <div id="field-selector-container" style="display:none; background: var(--card); border: 1px solid var(--accent); padding: 10px; border-radius: 10px; margin-bottom: 12px;">
+      <span style="font-size: 12px; font-weight: bold; color: var(--accent); display: block; margin-bottom: 6px;">
+        🔍 Datos encontrados en la base de datos:
+      </span>
+      <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="field-buttons"></div>
+    </div>
+
     <div class="quick-tags">
       <span style="font-size:12px; color:var(--text-muted); align-self:center;">Insertar Bloque:</span>
       <button class="tag-btn" onclick="insertTag('[ESTROFA 1]')">+ Estrofa 1</button>
@@ -426,7 +434,7 @@
 
     <div class="editor-container">  
       <div id="edit-preview" class="editor-layer"></div>
-      <textarea id="edit-raw" class="editor-layer" placeholder="[ESTROFA 1]&#10;G               C&#10;Señor mi Dios al contemplar los cielos...&#10;&#10;[CORO]&#10;G               C&#10;Mi corazón entona la canción..." oninput="handleEditorInput()"></textarea>  
+      <textarea id="edit-raw" class="editor-layer" placeholder="Ingresa los acordes y la letra..." oninput="handleEditorInput()"></textarea>  
     </div>  
 
     <button class="btn-action primary" style="width: 100%; padding: 14px;" onclick="saveSong()">Guardar Canción</button>  
@@ -613,38 +621,39 @@
     return chord.replace(/([A-Z]+[#b]?)/gi, (m) => latinoToAngloMap[m.toUpperCase()] || m);  
   }  
 
-  // CONVERSIÓN UNIVERSAL DE CUALQUIER FORMATO ANTIGUO A TEXTO PLANO
+  // FORMATO Y LÓGICA DE EXTRACCIÓN DE CAMPOS MULTIPLE
+  function formatValueToString(val) {
+    if (!val) return "";
+    if (typeof val === 'string') return val;
+    if (Array.isArray(val)) {
+      return val.map(item => {
+        if (typeof item === 'string') return item;
+        if (typeof item === 'object' && item !== null) {
+          const chord = item.chords || item.acordes || item.chord || '';
+          const text = item.text || item.letra || item.line || '';
+          return [chord, text].filter(Boolean).join('\n');
+        }
+        return '';
+      }).filter(Boolean).join('\n');
+    }
+    if (typeof val === 'object') return JSON.stringify(val);
+    return String(val);
+  }
+
   function getSongRawText(song) {
     if (!song) return "";
-    if (song.rawText) return song.rawText;
     
-    // Si la estructura antigua guardaba 'lyrics'
-    if (song.lyrics) {
-      if (typeof song.lyrics === 'string') return song.lyrics;
-      
-      if (Array.isArray(song.lyrics)) {
-        let lines = [];
-        song.lyrics.forEach(item => {
-          if (typeof item === 'string') {
-            lines.push(item);
-          } else if (typeof item === 'object') {
-            if (item.chords && item.text) {
-              lines.push(item.chords);
-              lines.push(item.text);
-            } else if (item.chords) {
-              lines.push(item.chords);
-            } else if (item.text) {
-              lines.push(item.text);
-            }
-          }
-        });
-        return lines.join('\n');
-      }
+    if (song.rawText && typeof song.rawText === 'string' && song.rawText.trim() !== '') {
+      return song.rawText;
     }
 
-    // Si la estructura antigua guardaba 'content' o 'body'
-    if (song.content) return song.content;
-    if (song.body) return song.body;
+    const keysToTry = ['lyrics', 'lines', 'content', 'body', 'letra', 'texto', 'acordes'];
+    for (let key of keysToTry) {
+      if (song[key]) {
+        const formatted = formatValueToString(song[key]);
+        if (formatted.trim() !== '') return formatted;
+      }
+    }
 
     return "";
   }
@@ -802,6 +811,7 @@
     stopAutoScroll();  
     editingSongId = null;  
     document.getElementById('editor-heading').innerText = "Agregar Nueva Canción";  
+    document.getElementById('field-selector-container').style.display = 'none';
     document.getElementById('list-view').style.display = 'none';  
     document.getElementById('song-viewer').style.display = 'none';  
     document.getElementById('song-editor').style.display = 'block';  
@@ -810,6 +820,42 @@
     document.getElementById('edit-raw').value = '';  
     handleEditorInput();
   }  
+
+  function editCurrentSong() {  
+    if (!currentSong) return;  
+    editingSongId = currentSong.id;  
+    document.getElementById('editor-heading').innerText = "Editar Canción";  
+    document.getElementById('edit-title').value = currentSong.title || '';  
+    document.getElementById('edit-author').value = currentSong.author || '';  
+    
+    // Inspección de campos disponibles en el objeto
+    const container = document.getElementById('field-selector-container');
+    const buttonsDiv = document.getElementById('field-buttons');
+    buttonsDiv.innerHTML = '';
+    
+    const availableKeys = Object.keys(currentSong).filter(k => k !== 'id' && k !== 'title' && k !== 'author' && k !== 'originalKey');
+    
+    if (availableKeys.length > 0) {
+      container.style.display = 'block';
+      availableKeys.forEach(key => {
+        const btn = document.createElement('button');
+        btn.className = 'tag-btn';
+        btn.innerText = `Cargar "${key}"`;
+        btn.onclick = () => {
+          document.getElementById('edit-raw').value = formatValueToString(currentSong[key]);
+          handleEditorInput();
+        };
+        buttonsDiv.appendChild(btn);
+      });
+    } else {
+      container.style.display = 'none';
+    }
+
+    document.getElementById('edit-raw').value = getSongRawText(currentSong);  
+    document.getElementById('song-viewer').style.display = 'none';  
+    document.getElementById('song-editor').style.display = 'block';  
+    handleEditorInput();
+  }
 
   function insertTag(tag) {
     const area = document.getElementById('edit-raw');
@@ -865,18 +911,6 @@
     renderCurrentTab();  
   }  
 
-  function editCurrentSong() {  
-    if (!currentSong) return;  
-    editingSongId = currentSong.id;  
-    document.getElementById('editor-heading').innerText = "Editar Canción";  
-    document.getElementById('edit-title').value = currentSong.title;  
-    document.getElementById('edit-author').value = currentSong.author || '';  
-    document.getElementById('edit-raw').value = getSongRawText(currentSong);  
-    document.getElementById('song-viewer').style.display = 'none';  
-    document.getElementById('song-editor').style.display = 'block';  
-    handleEditorInput();
-  }  
-
   async function deleteCurrentSong() {  
     if (!currentSong) return;  
     if (confirm(`¿Eliminar "${currentSong.title}"?`)) {  
@@ -898,7 +932,14 @@
 
     const parsed = parseRawSongWithBlocks(rawText);  
     const newId = editingSongId || ('local_' + Date.now());  
-    const songData = { id: newId, title: title, author: author || "Iglesia de Dios 7d", originalKey: parsed.key, rawText: rawText };  
+    
+    const songData = { 
+      id: newId, 
+      title: title, 
+      author: author || "Iglesia de Dios 7d", 
+      originalKey: parsed.key, 
+      rawText: rawText 
+    };  
 
     const index = songs.findIndex(s => s.id === newId);  
     if (index >= 0) songs[index] = songData; else songs.push(songData);  
