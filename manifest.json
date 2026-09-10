@@ -1,8 +1,20 @@
 {
-  "title": "Cuan Grande Es Él",
-  "key": "G",
-  "blocks": [
-    { "type": "verse", "label": "Verso 1", "chords": "G  C  G", "lyrics": "Señor mi Dios..." },
-    { "type": "chorus", "label": "Coro", "chords": "G  C  G", "lyrics": "Mi corazón entona..." }
-  ]
+  "short_name": "Cancionero",
+  "name": "Cancionero de la Iglesia",
+  "icons": [
+    {
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icon.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#1e3a8a",
+  "theme_color": "#1e3a8a",
+  "display": "standalone"
 }
