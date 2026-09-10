@@ -493,7 +493,6 @@
   }  
 
   function listenToSongs() {  
-    loadLocalSongs();  
     if (songsCollection) {  
       songsCollection.orderBy('title').onSnapshot(snapshot => {  
         songs = [];  
@@ -501,8 +500,12 @@
         localStorage.setItem('church_songs', JSON.stringify(songs));  
         if (document.getElementById('list-view').style.display !== 'none') renderCurrentTab();  
         updateSyncStatus();  
-      }, () => updateSyncStatus());  
+      }, () => {
+        loadLocalSongs();
+        updateSyncStatus();
+      });  
     } else {  
+      loadLocalSongs();
       updateSyncStatus();  
     }  
   }  
@@ -610,25 +613,44 @@
     return chord.replace(/([A-Z]+[#b]?)/gi, (m) => latinoToAngloMap[m.toUpperCase()] || m);  
   }  
 
-  // COMPATIBILIDAD CON ESTRUCTURA ANTERIOR
+  // CONVERSIÓN UNIVERSAL DE CUALQUIER FORMATO ANTIGUO A TEXTO PLANO
   function getSongRawText(song) {
     if (!song) return "";
     if (song.rawText) return song.rawText;
+    
+    // Si la estructura antigua guardaba 'lyrics'
     if (song.lyrics) {
       if (typeof song.lyrics === 'string') return song.lyrics;
+      
       if (Array.isArray(song.lyrics)) {
-        return song.lyrics.map(line => {
-          if (typeof line === 'string') return line;
-          return `${line.chords || ''}\n${line.text || ''}`;
-        }).join('\n');
+        let lines = [];
+        song.lyrics.forEach(item => {
+          if (typeof item === 'string') {
+            lines.push(item);
+          } else if (typeof item === 'object') {
+            if (item.chords && item.text) {
+              lines.push(item.chords);
+              lines.push(item.text);
+            } else if (item.chords) {
+              lines.push(item.chords);
+            } else if (item.text) {
+              lines.push(item.text);
+            }
+          }
+        });
+        return lines.join('\n');
       }
     }
+
+    // Si la estructura antigua guardaba 'content' o 'body'
+    if (song.content) return song.content;
+    if (song.body) return song.body;
+
     return "";
   }
 
-  /* PARSER CON SOPORTE PARA CANCIONES NUEVAS Y VIEJAS */
   function parseRawSongWithBlocks(rawText) {
-    if (!rawText) return { blocks: [], key: "C" };
+    if (!rawText || rawText.trim() === "") return { blocks: [], key: "C" };
     const rawLines = rawText.split('\n');
     const blocks = [];
     let currentBlock = { label: "ESTROFA 1", lines: [] };
@@ -708,6 +730,11 @@
     const rawText = getSongRawText(currentSong);
     const parsed = parseRawSongWithBlocks(rawText);
     
+    if (parsed.blocks.length === 0) {
+      targetContainer.innerHTML = `<div style="padding:20px; text-align:center; color:var(--text-muted);">Esta canción no contiene texto registrado o el formato no es compatible. Pulsa Editar para corregirla.</div>`;
+      return;
+    }
+
     parsed.blocks.forEach(block => {
       const blockDiv = document.createElement('div');
       blockDiv.className = 'song-block';
