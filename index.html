@@ -83,7 +83,7 @@
       background: var(--card);  
       color: var(--text);  
       box-sizing: border-box;  
-      margin-bottom: 16px;  
+      margin-bottom: 12px;  
       outline: none;  
     }  
 
@@ -150,8 +150,7 @@
 
     .btn-set.active { color: #f59e0b; border-color: #f59e0b; }  
 
-    /* VIEWER */  
-    .viewer, .editor, .live-viewer { display: none; }  
+    .viewer, .editor { display: none; }  
 
     .song-header { margin-bottom: 16px; }  
     .song-title-large { font-size: 26px; font-weight: 800; margin: 0 0 6px 0; }  
@@ -190,7 +189,7 @@
 
     .btn-action.primary { background: var(--accent); color: white; border: none; }  
 
-    /* DISEÑO POR BLOQUES MODERNO */
+    /* BLOQUES */
     .song-block {
       background: var(--block-bg);
       border: 1px solid var(--card-border);
@@ -201,7 +200,7 @@
 
     .block-label {
       display: inline-block;
-      font-size: 10px;
+      font-size: 11px;
       font-weight: 800;
       letter-spacing: 0.5px;
       color: var(--accent);
@@ -216,14 +215,13 @@
       font-family: "Courier New", Courier, monospace;
       font-size: 16px;
       line-height: 1.5;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
       white-space: pre-wrap;
     }
 
     .chord-line { color: var(--chord); font-weight: 700; }
     .text-line { color: var(--text); }
 
-    /* MENU HERRAMIENTAS SEGURO */
     .admin-menu {
       margin-top: 30px;
       padding: 12px;
@@ -240,7 +238,7 @@
       margin-top: 10px;
     }
 
-    /* EDITOR CON HIGHLIGHT EN VIVO */
+    /* EDITOR */
     .editor-container {
       position: relative;
       width: 100%;
@@ -248,7 +246,7 @@
       border: 1px solid var(--card-border);
       border-radius: 12px;
       background: var(--card);
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       overflow: hidden;
     }
 
@@ -283,27 +281,53 @@
     }
 
     .highlight-chord { color: var(--chord); font-weight: bold; }
+    .highlight-tag { color: var(--accent); font-weight: bold; background: rgba(59, 130, 246, 0.2); border-radius: 4px; padding: 0 4px; }
 
-    /* VISTA EN VIVO (PROYECCIÓN) */
+    .quick-tags {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+
+    .tag-btn {
+      background: var(--card);
+      border: 1px solid var(--card-border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* PANTALLA EN VIVO COMPLETA */
     .live-screen {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: #000;
       color: #fff;
       z-index: 9999;
-      padding: 24px;
+      padding: 20px;
+      overflow-y: auto;
       display: flex;
       flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      text-align: center;
     }
 
-    .live-text {
-      font-size: 32px;
-      font-weight: 700;
-      line-height: 1.4;
-      white-space: pre-line;
+    .live-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid #222;
+    }
+
+    .live-body {
+      flex-grow: 1;
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
     }
   </style>  
 </head>  
@@ -339,7 +363,7 @@
     <div id="song-container" class="song-list"></div>  
   </div>  
 
-  <!-- VISTA VISOR DE CANCIÓN -->  
+  <!-- VISTA VISOR -->  
   <div id="song-viewer" class="viewer">  
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">  
       <button class="btn-action" onclick="showList()">← Volver</button>  
@@ -357,7 +381,7 @@
       </div>  
     </div>  
 
-    <!-- Transposición -->  
+    <!-- Controls -->  
     <div class="controls-bar">  
       <span style="font-size: 13px; font-weight: 600;">Transponer:</span>  
       <div style="display: flex; gap: 4px;">  
@@ -369,7 +393,6 @@
       </div>  
     </div>  
 
-    <!-- Scroll & Fuente -->  
     <div class="controls-bar">  
       <button class="btn-action primary" id="scroll-toggle-btn" onclick="toggleAutoScroll()">▶ Auto-Scroll</button>  
       <div style="display: flex; align-items: center; gap: 6px;">  
@@ -383,7 +406,6 @@
 
     <div id="song-content"></div>  
 
-    <!-- Menú de Administración Protegido -->
     <div class="admin-menu">
       <button class="btn-action" style="width:100%; border:none; background:transparent;" onclick="toggleAdminActions()">⚙️ Opciones de Edición</button>
       <div id="admin-actions" class="admin-actions">
@@ -401,9 +423,18 @@
     <input type="text" class="search-bar" id="edit-title" placeholder="Título de la canción">  
     <input type="text" class="search-bar" id="edit-author" placeholder="Autor / Grupo (Opcional)">  
 
+    <!-- Botones rápidos de bloques -->
+    <div class="quick-tags">
+      <span style="font-size:12px; color:var(--text-muted); align-self:center;">Insertar Bloque:</span>
+      <button class="tag-btn" onclick="insertTag('[ESTROFA 1]')">+ Estrofa 1</button>
+      <button class="tag-btn" onclick="insertTag('[ESTROFA 2]')">+ Estrofa 2</button>
+      <button class="tag-btn" onclick="insertTag('[CORO]')">+ Coro</button>
+      <button class="tag-btn" onclick="insertTag('[PUENTE]')">+ Puente</button>
+    </div>
+
     <div class="editor-container">  
       <div id="edit-preview" class="editor-layer"></div>
-      <textarea id="edit-raw" class="editor-layer" placeholder="G               C&#10;Señor mi Dios al contemplar los cielos..." oninput="handleEditorInput()"></textarea>  
+      <textarea id="edit-raw" class="editor-layer" placeholder="[ESTROFA 1]&#10;G               C&#10;Señor mi Dios al contemplar los cielos...&#10;&#10;[CORO]&#10;G               C&#10;Mi corazón entona la canción..." oninput="handleEditorInput()"></textarea>  
     </div>  
 
     <button class="btn-action primary" style="width: 100%; padding: 14px;" onclick="saveSong()">Guardar Canción</button>  
@@ -411,10 +442,18 @@
 
 </div>  
 
-<!-- PANTALLA EN VIVO / PROYECCIÓN -->
-<div id="live-screen" class="live-screen" style="display:none;" onclick="closeLiveView()">
-  <div class="live-text" id="live-text-content"></div>
-  <div style="position:absolute; bottom:20px; font-size:12px; opacity:0.6;">Toca la pantalla para salir</div>
+<!-- VISTA EN VIVO -->
+<div id="live-screen" class="live-screen" style="display:none;">
+  <div class="live-header">
+    <button class="btn-action" onclick="closeLiveView()">← Salir de En Vivo</button>
+    <div style="display: flex; gap: 8px; align-items: center;">
+      <button class="btn-action primary" id="live-scroll-btn" onclick="toggleLiveScroll()">▶ Auto-Scroll</button>
+      <button class="btn-action" onclick="changeLiveSpeed(-1)">-</button>
+      <span id="live-speed-display" style="font-size: 13px; font-weight: bold;">1x</span>
+      <button class="btn-action" onclick="changeLiveSpeed(1)">+</button>
+    </div>
+  </div>
+  <div id="live-body" class="live-body"></div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>  
@@ -524,7 +563,7 @@
       listToRender = listToRender.filter(s =>   
         s.title.toLowerCase().includes(query) ||   
         (s.author && s.author.toLowerCase().includes(query)) ||  
-        (s.lines && s.lines.some(l => (l.text && l.text.toLowerCase().includes(query)) || (l.chords && l.chords.toLowerCase().includes(query))))  
+        (s.rawText && s.rawText.toLowerCase().includes(query))  
       );  
     }  
     renderSongList(listToRender);  
@@ -574,39 +613,53 @@
     return (chordCount / tokens.length) >= 0.5;  
   }  
 
+  function isTagLine(line) { return /^\[.*\]$/.test(line.trim()); }
+
   function normalizeChordToAnglo(chord) {  
     return chord.replace(/([A-Z]+[#b]?)/gi, (m) => latinoToAngloMap[m.toUpperCase()] || m);  
   }  
 
-  function parseRawSong(rawText) {  
-    const rawLines = rawText.split('\n');  
-    const parsedLines = [];  
-    let detectedKey = "C";  
-    let firstChordFound = false;  
+  /* PARSER CON BLOQUES ESTRUCTURADOS */
+  function parseRawSongWithBlocks(rawText) {
+    const rawLines = rawText.split('\n');
+    const blocks = [];
+    let currentBlock = { label: "ESTROFA 1", lines: [] };
+    let detectedKey = "C";
+    let firstChordFound = false;
+    let autoBlockCount = 1;
 
-    for (let i = 0; i < rawLines.length; i++) {  
-      let current = rawLines[i];  
-      if (isChordLine(current)) {  
-        current = current.replace(/([A-ZÑa-z]+[#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-ZÑa-z]+[#b]?)?)/gi, (m) => normalizeChordToAnglo(m));  
-        if (!firstChordFound) {  
-          const firstChord = current.trim().split(/\s+/)[0];  
-          const match = firstChord.match(/^([A-G][#b]?)/);  
-          if (match) detectedKey = match[1];  
-          firstChordFound = true;  
-        }  
-        const nextLine = rawLines[i + 1];  
-        if (nextLine && !isChordLine(nextLine)) {  
-          parsedLines.push({ chords: current, text: nextLine });  
-          i++;  
-        } else {  
-          parsedLines.push({ chords: current, text: "" });  
-        }  
-      } else if (current.trim() !== "") {  
-        parsedLines.push({ chords: "", text: current });  
-      }  
-    }  
-    return { lines: parsedLines, key: detectedKey };  
-  }  
+    for (let i = 0; i < rawLines.length; i++) {
+      let line = rawLines[i];
+
+      if (isTagLine(line)) {
+        if (currentBlock.lines.length > 0) blocks.push(currentBlock);
+        currentBlock = { label: line.trim().replace('[', '').replace(']', ''), lines: [] };
+        continue;
+      }
+
+      if (isChordLine(line)) {
+        line = line.replace(/([A-ZÑa-z]+[#b]?(?:m|maj|min|dim|aug|sus)?[0-9]?(?:\/[A-ZÑa-z]+[#b]?)?)/gi, (m) => normalizeChordToAnglo(m));
+        if (!firstChordFound) {
+          const firstChord = line.trim().split(/\s+/)[0];
+          const match = firstChord.match(/^([A-G][#b]?)/);
+          if (match) detectedKey = match[1];
+          firstChordFound = true;
+        }
+        const nextLine = rawLines[i + 1];
+        if (nextLine && !isChordLine(nextLine) && !isTagLine(nextLine)) {
+          currentBlock.lines.push({ chords: line, text: nextLine });
+          i++;
+        } else {
+          currentBlock.lines.push({ chords: line, text: "" });
+        }
+      } else if (line.trim() !== "") {
+        currentBlock.lines.push({ chords: "", text: line });
+      }
+    }
+
+    if (currentBlock.lines.length > 0) blocks.push(currentBlock);
+    return { blocks: blocks, key: detectedKey };
+  }
 
   function transposeNote(note, steps) {  
     const regex = /^([A-G][#b]?)(.*)/;  
@@ -641,50 +694,49 @@
     return transposed;  
   }  
 
+  function buildBlocksHTML(targetContainer) {
+    if (!currentSong) return;
+    targetContainer.innerHTML = '';
+
+    const parsed = parseRawSongWithBlocks(currentSong.rawText || "");
+    
+    parsed.blocks.forEach(block => {
+      const blockDiv = document.createElement('div');
+      blockDiv.className = 'song-block';
+
+      const label = document.createElement('div');
+      label.className = 'block-label';
+      label.innerText = block.label;
+      blockDiv.appendChild(label);
+
+      block.lines.forEach(line => {
+        const pair = document.createElement('div');
+        pair.className = 'line-pair';
+
+        if (line.chords) {
+          const chordDiv = document.createElement('div');
+          chordDiv.className = 'chord-line';
+          chordDiv.innerText = transposeChordLine(line.chords, currentTransposeSteps);
+          pair.appendChild(chordDiv);
+        }
+        if (line.text) {
+          const textDiv = document.createElement('div');
+          textDiv.className = 'text-line';
+          textDiv.innerText = line.text;
+          pair.appendChild(textDiv);
+        }
+        blockDiv.appendChild(pair);
+      });
+
+      targetContainer.appendChild(blockDiv);
+    });
+  }
+
   function renderTransposedContent() {  
     if (!currentSong) return;  
     const baseKey = transposeNote(currentSong.originalKey || 'C', currentTransposeSteps);  
     document.getElementById('current-key-display').innerText = formatKeyDisplay(baseKey);  
-    const container = document.getElementById('song-content');  
-    container.innerHTML = '';  
-
-    if (!currentSong.lines) return;
-
-    let currentBlock = null;
-    let blockIndex = 1;
-
-    currentSong.lines.forEach((line, index) => {  
-      if (!currentBlock || index % 4 === 0) {
-        currentBlock = document.createElement('div');
-        currentBlock.className = 'song-block';
-        
-        const label = document.createElement('div');
-        label.className = 'block-label';
-        label.innerText = index === 0 ? 'ESTROFA 1' : (index >= 8 ? 'CORO' : `ESTROFA ${blockIndex}`);
-        if (index < 8) blockIndex++;
-        
-        currentBlock.appendChild(label);
-        container.appendChild(currentBlock);
-      }
-
-      const pair = document.createElement('div');
-      pair.className = 'line-pair';
-
-      if (line.chords) {  
-        const chordDiv = document.createElement('div');  
-        chordDiv.className = 'chord-line';  
-        chordDiv.innerText = transposeChordLine(line.chords, currentTransposeSteps);  
-        pair.appendChild(chordDiv);  
-      }  
-      if (line.text) {  
-        const textDiv = document.createElement('div');  
-        textDiv.className = 'text-line';  
-        textDiv.innerText = line.text;  
-        pair.appendChild(textDiv);  
-      }  
-
-      currentBlock.appendChild(pair);
-    });  
+    buildBlocksHTML(document.getElementById('song-content'));
   }  
 
   function transpose(steps) { currentTransposeSteps += steps; renderTransposedContent(); }  
@@ -724,12 +776,24 @@
     handleEditorInput();
   }  
 
+  function insertTag(tag) {
+    const area = document.getElementById('edit-raw');
+    const start = area.selectionStart;
+    const end = area.selectionEnd;
+    const text = area.value;
+    area.value = text.substring(0, start) + "\n" + tag + "\n" + text.substring(end);
+    handleEditorInput();
+  }
+
   function handleEditorInput() {
     const raw = document.getElementById('edit-raw').value;
     const preview = document.getElementById('edit-preview');
     const lines = raw.split('\n');
     
     let html = lines.map(line => {
+      if (isTagLine(line)) {
+        return `<span class="highlight-tag">${line}</span>`;
+      }
       if (isChordLine(line)) {
         return `<span class="highlight-chord">${line}</span>`;
       }
@@ -747,18 +811,14 @@
   function openLiveView() {
     if (!currentSong) return;
     const liveScreen = document.getElementById('live-screen');
-    const liveText = document.getElementById('live-text-content');
+    const liveBody = document.getElementById('live-body');
     
-    let pureLyrics = "";
-    if (currentSong.lines) {
-      pureLyrics = currentSong.lines.map(l => l.text).filter(t => t.trim() !== "").join('\n');
-    }
-    
-    liveText.innerText = pureLyrics || currentSong.title;
+    buildBlocksHTML(liveBody);
     liveScreen.style.display = 'flex';
   }
 
   function closeLiveView() {
+    stopAutoScroll();
     document.getElementById('live-screen').style.display = 'none';
   }
 
@@ -774,16 +834,9 @@
     if (!currentSong) return;  
     editingSongId = currentSong.id;  
     document.getElementById('editor-heading').innerText = "Editar Canción";  
-    let rawText = "";  
-    if (currentSong.lines) {  
-      currentSong.lines.forEach(l => {  
-        if (l.chords) rawText += l.chords + "\n";  
-        if (l.text) rawText += l.text + "\n";  
-      });  
-    }  
     document.getElementById('edit-title').value = currentSong.title;  
     document.getElementById('edit-author').value = currentSong.author || '';  
-    document.getElementById('edit-raw').value = rawText;  
+    document.getElementById('edit-raw').value = currentSong.rawText || "";  
     document.getElementById('song-viewer').style.display = 'none';  
     document.getElementById('song-editor').style.display = 'block';  
     handleEditorInput();
@@ -808,9 +861,9 @@
     const rawText = document.getElementById('edit-raw').value;  
     if (!title || !rawText.trim()) { alert("Ingresa un título y el contenido."); return; }  
 
-    const { lines, key } = parseRawSong(rawText);  
+    const parsed = parseRawSongWithBlocks(rawText);  
     const newId = editingSongId || ('local_' + Date.now());  
-    const songData = { id: newId, title: title, author: author || "Iglesia de Dios 7d", originalKey: key, lines: lines };  
+    const songData = { id: newId, title: title, author: author || "Iglesia de Dios 7d", originalKey: parsed.key, rawText: rawText };  
 
     const index = songs.findIndex(s => s.id === newId);  
     if (index >= 0) songs[index] = songData; else songs.push(songData);  
@@ -826,15 +879,27 @@
     }  
   }  
 
-  function toggleAutoScroll() { isScrolling ? stopAutoScroll() : startAutoScroll(); }  
-  function startAutoScroll() {  
+  function toggleAutoScroll() { isScrolling ? stopAutoScroll() : startAutoScroll(window); }  
+  function toggleLiveScroll() { 
+    const screen = document.getElementById('live-screen');
+    isScrolling ? stopAutoScroll() : startAutoScroll(screen); 
+  }
+
+  function startAutoScroll(targetContainer) {  
     stopAutoScroll();  
     isScrolling = true;  
-    document.getElementById('scroll-toggle-btn').innerText = "⏸ Pausa";  
+    const btn = document.getElementById('scroll-toggle-btn');  
+    const liveBtn = document.getElementById('live-scroll-btn');
+    if (btn) btn.innerText = "⏸ Pausa";  
+    if (liveBtn) liveBtn.innerText = "⏸ Pausa";
+
     const delay = Math.max(10, 50 - (scrollSpeed * 8));  
     scrollInterval = setInterval(() => {  
-      window.scrollBy(0, 1);  
-      if ((window.innerHeight + window.scrollY) >= document.body.offsetHeight - 10) stopAutoScroll();  
+      if (targetContainer === window) {
+        window.scrollBy(0, 1);  
+      } else {
+        targetContainer.scrollTop += 1;
+      }
     }, delay);  
   }  
 
@@ -842,13 +907,21 @@
     isScrolling = false;  
     if (scrollInterval) clearInterval(scrollInterval);  
     const btn = document.getElementById('scroll-toggle-btn');  
+    const liveBtn = document.getElementById('live-scroll-btn');
     if (btn) btn.innerText = "▶ Auto-Scroll";  
+    if (liveBtn) liveBtn.innerText = "▶ Auto-Scroll";
   }  
 
   function changeScrollSpeed(delta) {  
     scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));  
     document.getElementById('scroll-speed-display').innerText = scrollSpeed + 'x';  
-    if (isScrolling) startAutoScroll();  
+    if (isScrolling) startAutoScroll(window);  
+  }  
+
+  function changeLiveSpeed(delta) {  
+    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));  
+    document.getElementById('live-speed-display').innerText = scrollSpeed + 'x';  
+    if (isScrolling) startAutoScroll(document.getElementById('live-screen'));  
   }  
 
   function changeFontSize(delta) {  
