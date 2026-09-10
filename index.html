@@ -11,6 +11,9 @@
   <link rel="manifest" href="manifest.json">  
   <meta name="theme-color" content="#0b0f19">  
 
+  <!-- Librería PeerJS para Modo Director sin servidor backend adicional -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
   <style>  
     :root {  
       --bg: #0b0f19;  
@@ -253,7 +256,7 @@
       top: 0; left: 0;
       width: 100%; height: 100%;
       padding: 12px;
-      padding-bottom: 80px; /* Margen inferior para scroll holgado */
+      padding-bottom: 80px;
       font-family: "Courier New", Courier, monospace;
       font-size: 15px;
       line-height: 1.5;
@@ -346,6 +349,33 @@
       <span id="connection-status">Cargando...</span>  
       <span id="pending-sync" style="color: #f59e0b;"></span>  
     </div>  
+
+    <!-- PANEL MODO DIRECTOR / SINCRONIZACIÓN -->
+    <div class="controls-bar" id="director-panel" style="flex-direction: column; align-items: stretch; gap: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 13px; font-weight: 700;">📡 Sincronización:</span>
+        <select id="sync-role-select" class="btn-action" onchange="changeSyncRole(this.value)" style="padding: 4px 8px;">
+          <option value="none">OFF (Individual)</option>
+          <option value="director">👑 Ser Director</option>
+          <option value="musician">🎸 Ser Músico (Seguidor)</option>
+        </select>
+      </div>
+
+      <!-- Controles para el Director -->
+      <div id="director-controls" style="display: none; align-items: center; justify-content: space-between; background: var(--bg); padding: 8px; border-radius: 8px;">
+        <span style="font-size: 12px; color: var(--text-muted);">Código de Sala:</span>
+        <strong id="room-code-display" style="font-size: 14px; color: var(--accent); letter-spacing: 1px;">CREANDO...</strong>
+        <button class="btn-action" onclick="copyRoomCode()" style="padding: 4px 8px; font-size: 11px;">📋 Copiar</button>
+      </div>
+
+      <!-- Controles para el Músico / Seguidor -->
+      <div id="musician-controls" style="display: none; gap: 6px;">
+        <input type="text" id="join-room-input" class="search-bar" placeholder="Código de la Sala" style="margin-bottom: 0; padding: 6px 10px; font-size: 13px;">
+        <button class="btn-action primary" onclick="connectToDirector()" style="white-space: nowrap;">Conectar</button>
+      </div>
+
+      <div id="sync-status-msg" style="font-size: 11px; text-align: center; color: var(--text-muted); display: none;"></div>
+    </div>
 
     <div class="tabs-bar">  
       <button class="tab-btn active" id="tab-all" onclick="switchTab('all')">Todas</button>  
@@ -1027,6 +1057,42 @@
     const isLight = document.body.classList.contains('light-mode');  
     document.getElementById('theme-btn').innerText = isLight ? '☀️' : '🌙';  
   }  
+
+  // --- FUNCIONES PREPARATORIAS PARA MODO DIRECTOR (PASO 1) ---
+  function changeSyncRole(role) {
+    const dirCtrl = document.getElementById('director-controls');
+    const musCtrl = document.getElementById('musician-controls');
+    const msg = document.getElementById('sync-status-msg');
+
+    dirCtrl.style.display = (role === 'director') ? 'flex' : 'none';
+    musCtrl.style.display = (role === 'musician') ? 'flex' : 'none';
+    msg.style.display = (role === 'none') ? 'none' : 'block';
+
+    if (role === 'director') {
+      msg.innerText = "Inicializando sala de Director...";
+    } else if (role === 'musician') {
+      msg.innerText = "Ingresa el código que proporcione el Director";
+    } else {
+      msg.innerText = "";
+    }
+  }
+
+  function copyRoomCode() {
+    const code = document.getElementById('room-code-display').innerText;
+    if (code && code !== 'CREANDO...') {
+      navigator.clipboard.writeText(code);
+      alert('Código de sala copiado: ' + code);
+    }
+  }
+
+  function connectToDirector() {
+    const code = document.getElementById('join-room-input').value.trim();
+    if (!code) {
+      alert('Por favor ingresa un código de sala válido.');
+      return;
+    }
+    document.getElementById('sync-status-msg').innerText = "Conectando a " + code + "...";
+  }
 
   document.addEventListener('DOMContentLoaded', () => {  
     listenToSongs();  
