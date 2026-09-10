@@ -526,6 +526,13 @@
   let scrollSpeed = 1;  
   let currentFontSize = 16;  
 
+  // Variables para el Modo Director (PeerJS)
+  let peer = null;
+  let directorConn = null;
+  let musicianConns = [];
+  let currentRole = 'none';
+  let myRoomCode = '';
+
   if ('serviceWorker' in navigator) {  
     navigator.serviceWorker.register('sw.js').catch(() => {});  
   }  
@@ -812,8 +819,18 @@
     buildBlocksHTML(document.getElementById('song-content'));
   }  
 
-  function transpose(steps) { currentTransposeSteps += steps; renderTransposedContent(); }  
-  function resetKey() { currentTransposeSteps = 0; renderTransposedContent(); }  
+  function transpose(steps) { 
+    currentTransposeSteps += steps; 
+    renderTransposedContent(); 
+    broadcastToMusicians({ type: 'TRANSPOSE', steps: currentTransposeSteps });
+  }  
+
+  function resetKey() { 
+    currentTransposeSteps = 0; 
+    renderTransposedContent(); 
+    broadcastToMusicians({ type: 'TRANSPOSE', steps: 0 });
+  }  
+
   function toggleNotation() {  
     useLatinoNotation = !useLatinoNotation;  
     document.getElementById('notation-btn').innerText = useLatinoNotation ? "Do»C" : "C»Do";  
@@ -821,6 +838,7 @@
   }  
 
   function openSong(id) {  
+    broadcastToMusicians({ type: 'OPEN_SONG', songId: id, transpose: 0 });
     stopAutoScroll();  
     currentSong = songs.find(s => s.id === id);  
     if (!currentSong) return;  
@@ -951,6 +969,7 @@
   }
 
   function showList() {  
+    broadcastToMusicians({ type: 'CLOSE_SONG' });
     stopAutoScroll();  
     document.getElementById('list-view').style.display = 'block';  
     document.getElementById('song-viewer').style.display = 'none';  
@@ -1024,6 +1043,7 @@
         targetContainer.scrollTop += 1;
       }
     }, delay);  
+    broadcastToMusicians({ type: 'SCROLL_START' });
   }  
 
   function stopAutoScroll() {  
@@ -1033,6 +1053,7 @@
     const liveBtn = document.getElementById('live-scroll-btn');
     if (btn) btn.innerText = "▶ Auto-Scroll";  
     if (liveBtn) liveBtn.innerText = "▶ Auto-Scroll";
+    broadcastToMusicians({ type: 'SCROLL_STOP' });
   }  
 
   function changeScrollSpeed(delta) {  
@@ -1058,8 +1079,10 @@
     document.getElementById('theme-btn').innerText = isLight ? '☀️' : '🌙';  
   }  
 
-  // --- FUNCIONES PREPARATORIAS PARA MODO DIRECTOR (PASO 1) ---
+  // --- LÓGICA COMPLETA MODO DIRECTOR (PEERJS) ---
+
   function changeSyncRole(role) {
+    currentRole = role;
     const dirCtrl = document.getElementById('director-controls');
     const musCtrl = document.getElementById('musician-controls');
     const msg = document.getElementById('sync-status-msg');
@@ -1068,12 +1091,123 @@
     musCtrl.style.display = (role === 'musician') ? 'flex' : 'none';
     msg.style.display = (role === 'none') ? 'none' : 'block';
 
+    if (peer) { peer.destroy(); peer = null; }
+    musicianConns = [];
+    directorConn = null;
+
     if (role === 'director') {
-      msg.innerText = "Inicializando sala de Director...";
+      msg.innerText = "Creando sala...";
+      initDirectorPeer();
     } else if (role === 'musician') {
-      msg.innerText = "Ingresa el código que proporcione el Director";
+      msg.innerText = "Ingresa el código que te proporcione el Director";
     } else {
       msg.innerText = "";
+    }
+  }
+
+  function generateShortCode() {
+    return Math.random().toString(36).substring(2, 6).toUpperCase();
+  }
+
+  function initDirectorPeer() {
+    myRoomCode = generateShortCode();
+    const peerId = 'id7d-' + myRoomCode; 
+
+    peer = new Peer(peerId);
+
+    peer.on('open', (id) => {
+      document.getElementById('room-code-display').innerText = myRoomCode;
+      document.getElementById('sync-status-msg').innerText = "👑 Sala activa. Esperando a los músicos...";
+    });
+
+    peer.on('connection', (conn) => {
+      musicianConns.push(conn);
+      document.getElementById('sync-status-msg').innerText = `🎸 Músicos conectados: ${musicianConns.length}`;
+
+      if (currentSong) {
+        conn.on('open', () => {
+          conn.send({
+            type: 'OPEN_SONG',
+            songId: currentSong.id,
+            transpose: currentTransposeSteps
+          });
+        });
+      }
+
+      conn.on('close', () => {
+        musicianConns = musicianConns.filter(c => c !== conn);
+        document.getElementById('sync-status-msg').innerText = `🎸 Músicos conectados: ${musicianConns.length}`;
+      });
+    });
+
+    peer.on('error', (err) => {
+      console.log("Error PeerJS Director:", err);
+      if (err.type === 'unavailable-id') {
+        initDirectorPeer();
+      }
+    });
+  }
+
+  function connectToDirector() {
+    const codeInput = document.getElementById('join-room-input').value.trim().toUpperCase();
+    if (!codeInput) {
+      alert('Por favor ingresa un código de sala válido.');
+      return;
+    }
+
+    const targetPeerId = 'id7d-' + codeInput;
+    document.getElementById('sync-status-msg').innerText = "Conectando a " + codeInput + "...";
+
+    peer = new Peer(); 
+
+    peer.on('open', () => {
+      directorConn = peer.connect(targetPeerId);
+
+      directorConn.on('open', () => {
+        document.getElementById('sync-status-msg').innerText = "✅ Sincronizado con el Director (" + codeInput + ")";
+        document.getElementById('sync-status-msg').style.color = "var(--accent-green)";
+      });
+
+      directorConn.on('data', (data) => {
+        handleDirectorCommand(data);
+      });
+
+      directorConn.on('close', () => {
+        document.getElementById('sync-status-msg').innerText = "❌ El Director cerró la sala.";
+        document.getElementById('sync-status-msg').style.color = "var(--danger)";
+      });
+    });
+
+    peer.on('error', (err) => {
+      document.getElementById('sync-status-msg').innerText = "❌ Error de conexión. Revisa el código.";
+      document.getElementById('sync-status-msg').style.color = "var(--danger)";
+    });
+  }
+
+  function handleDirectorCommand(data) {
+    if (data.type === 'OPEN_SONG') {
+      openSong(data.songId);
+      if (data.transpose !== undefined) {
+        currentTransposeSteps = data.transpose;
+        renderTransposedContent();
+      }
+    } else if (data.type === 'TRANSPOSE') {
+      currentTransposeSteps = data.steps;
+      renderTransposedContent();
+    } else if (data.type === 'SCROLL_START') {
+      if (!isScrolling) startAutoScroll(window);
+    } else if (data.type === 'SCROLL_STOP') {
+      stopAutoScroll();
+    } else if (data.type === 'CLOSE_SONG') {
+      showList();
+    }
+  }
+
+  function broadcastToMusicians(data) {
+    if (currentRole === 'director' && musicianConns.length > 0) {
+      musicianConns.forEach(conn => {
+        if (conn.open) conn.send(data);
+      });
     }
   }
 
@@ -1083,15 +1217,6 @@
       navigator.clipboard.writeText(code);
       alert('Código de sala copiado: ' + code);
     }
-  }
-
-  function connectToDirector() {
-    const code = document.getElementById('join-room-input').value.trim();
-    if (!code) {
-      alert('Por favor ingresa un código de sala válido.');
-      return;
-    }
-    document.getElementById('sync-status-msg').innerText = "Conectando a " + code + "...";
   }
 
   document.addEventListener('DOMContentLoaded', () => {  
