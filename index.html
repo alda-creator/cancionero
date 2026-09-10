@@ -474,7 +474,7 @@
 
 <div id="live-screen" class="live-screen" style="display:none;">
   <div class="live-header">
-    <button class="btn-action" onclick="closeLiveView()">← Salir de En Vivo</button>
+    <button class="btn-action" id="live-exit-btn" onclick="closeLiveView()">← Salir de En Vivo</button>
     <div style="display: flex; gap: 8px; align-items: center;">
       <button class="btn-action primary" id="live-scroll-btn" onclick="toggleLiveScroll()">▶ Auto-Scroll</button>
       <button class="btn-action" onclick="changeLiveSpeed(-1)">-</button>
@@ -532,6 +532,7 @@
   let musicianConns = [];
   let currentRole = 'none';
   let myRoomCode = '';
+  let isRemoteScroll = false; // Evita bucles infinitos al sincronizar scroll
 
   if ('serviceWorker' in navigator) {  
     navigator.serviceWorker.register('sw.js').catch(() => {});  
@@ -961,6 +962,20 @@
     
     buildBlocksHTML(liveBody);
     liveScreen.style.display = 'flex';
+
+    // Ocultar botón de salir si es músico para evitar desconexión no deseada
+    const exitBtn = document.getElementById('live-exit-btn');
+    if (exitBtn) {
+      exitBtn.style.display = (currentRole === 'musician') ? 'none' : 'inline-block';
+    }
+
+    // Escuchar scroll dentro del contenedor de En Vivo (para el Director)
+    liveScreen.onscroll = () => {
+      if (currentRole === 'director' && !isRemoteScroll) {
+        const scrollPercent = liveScreen.scrollTop / (liveScreen.scrollHeight - liveScreen.clientHeight);
+        broadcastToMusicians({ type: 'MANUAL_SCROLL', percent: scrollPercent });
+      }
+    };
   }
 
   function closeLiveView() {
@@ -1191,14 +1206,37 @@
         currentTransposeSteps = data.transpose;
         renderTransposedContent();
       }
+      // Músico entra directo a pantalla completa En Vivo
+      if (currentRole === 'musician') {
+        openLiveView();
+      }
     } else if (data.type === 'TRANSPOSE') {
       currentTransposeSteps = data.steps;
       renderTransposedContent();
+      if (document.getElementById('live-screen').style.display !== 'none') {
+        buildBlocksHTML(document.getElementById('live-body'));
+      }
     } else if (data.type === 'SCROLL_START') {
-      if (!isScrolling) startAutoScroll(window);
+      const isLive = document.getElementById('live-screen').style.display !== 'none';
+      const target = isLive ? document.getElementById('live-screen') : window;
+      if (!isScrolling) startAutoScroll(target);
     } else if (data.type === 'SCROLL_STOP') {
       stopAutoScroll();
+    } else if (data.type === 'MANUAL_SCROLL') {
+      isRemoteScroll = true;
+      const isLive = document.getElementById('live-screen').style.display !== 'none';
+      if (isLive) {
+        const liveContainer = document.getElementById('live-screen');
+        liveContainer.scrollTop = data.percent * (liveContainer.scrollHeight - liveContainer.clientHeight);
+      } else {
+        const targetY = data.percent * (document.documentElement.scrollHeight - window.innerHeight);
+        window.scrollTo({ top: targetY });
+      }
+      setTimeout(() => { isRemoteScroll = false; }, 50);
     } else if (data.type === 'CLOSE_SONG') {
+      if (currentRole === 'musician') {
+        closeLiveView();
+      }
       showList();
     }
   }
@@ -1226,6 +1264,14 @@
     if (rawArea) {
       rawArea.addEventListener('scroll', syncEditorScroll);
     }
+
+    // Escuchar desplazamiento de ventana completo (para cuando el Director está en vista normal)
+    window.addEventListener('scroll', () => {
+      if (currentRole === 'director' && currentSong && !isRemoteScroll) {
+        const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
+        broadcastToMusicians({ type: 'MANUAL_SCROLL', percent: scrollPercent });
+      }
+    });
   });  
 </script>  
 </body>  
