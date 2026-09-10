@@ -1,57 +1,61 @@
 const CACHE_NAME = 'cancionero-v11';
-
-// Lista completa de archivos de la app + dependencias externas (Firebase y fuentes)
-const urlsToCache = [
+const ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './icon.png',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js',
-  'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js'
+  './canciones.json'
 ];
 
-// 1. Instalación: Descarga y guarda los recursos esenciales en caché
-self.addEventListener('install', event => {
-  self.skipWaiting();
+// Instalación del Service Worker y almacenamiento en caché de los activos iniciales
+self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(urlsToCache))
+    caches.open(CACHE_NAME).then((cache) => {
+      return cache.addAll(ASSETS);
+    })
   );
+  self.skipWaiting();
 });
 
-// 2. Activación: Elimina versiones antiguas de caché (v1, v5, etc.) para mantener espacio limpio
-self.addEventListener('activate', event => {
+// Activación: limpia las versiones viejas de caché (v10, etc.)
+self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then(cacheNames => {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map(cache => {
+        cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
+            console.log('Eliminando caché antiguo:', cache);
             return caches.delete(cache);
           }
         })
       );
-    }).then(() => self.clients.claim())
+    })
   );
+  self.clients.claim();
 });
 
-// 3. Peticiones (Cache-First): Intenta entregar desde la caché local primero.
-// Si no existe en la memoria, va a buscarlo a internet.
-self.addEventListener('fetch', event => {
-  // Evitamos interceptar peticiones directas a Firestore DB para no interferir con el tiempo real
-  if (event.request.url.includes('firestore.googleapis.com')) {
+// Estrategia de respuesta: intenta buscar en la red primero y, si falla (offline), usa el caché
+self.addEventListener('fetch', (event) => {
+  // Ignorar peticiones a Firestore o Firebase Auth para dejar que la SDK maneje la persistencia
+  if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('identitytoolkit')) {
     return;
   }
 
   event.respondWith(
-    caches.match(event.request).then(cachedResponse => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      return fetch(event.request).then(networkResponse => {
+    fetch(event.request)
+      .then((networkResponse) => {
+        // Guarda una copia de la respuesta fresca en el caché
+        if (event.request.method === 'GET' && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseClone);
+          });
+        }
         return networkResponse;
-      }).catch(() => {
-        // Manejo silencioso en caso de estar totalmente offline
-      });
-    })
+      })
+      .catch(() => {
+        // Si no hay red, sirve la versión de la memoria local
+        return caches.match(event.request);
+      })
   );
 });
