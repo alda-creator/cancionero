@@ -1,61 +1,61 @@
-const CACHE_NAME = 'cancionero-v21';
-const ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon.png',
-  './canciones.json'
+const CACHE_NAME = 'cancionero-cache-v2';
+
+// Archivos esenciales para que la app y el Modo Director funcionen 100% offline
+const ASSETS_TO_CACHE = [
+  '/',
+  '/index.html',
+  '/css/style.css',
+  '/js/app.js',
+  '/js/peerjs.min.js',
+  '/manifest.json',
+  '/img/icon-id.png'
 ];
 
-// Instalación del Service Worker y almacenamiento en caché de los activos iniciales
+// 1. INSTALACIÓN: Descarga y guarda todos los archivos locales en la memoria
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        console.log('[Service Worker] Guardando archivos en caché local...');
+        return cache.addAll(ASSETS_TO_CACHE);
+      })
+      .then(() => self.skipWaiting()) // Fuerza al nuevo Service Worker a tomar el control de inmediato
   );
-  self.skipWaiting();
 });
 
-// Activación: limpia las versiones viejas de caché (v10, etc.)
+// 2. ACTIVACIÓN: Elimina cachés antiguas de versiones anteriores para no acumular basura
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cache) => {
           if (cache !== CACHE_NAME) {
-            console.log('Eliminando caché antiguo:', cache);
+            console.log('[Service Worker] Eliminando caché antigua:', cache);
             return caches.delete(cache);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim()) // Toma control de todas las pestañas abiertas
   );
-  self.clients.claim();
 });
 
-// Estrategia de respuesta: intenta buscar en la red primero y, si falla (offline), usa el caché
+// 3. PETICIONES (FETCH): Responde con los archivos guardados en el teléfono sin tocar internet
 self.addEventListener('fetch', (event) => {
-  // Ignorar peticiones a Firestore o Firebase Auth para dejar que la SDK maneje la persistencia
-  if (event.request.url.includes('firestore.googleapis.com') || event.request.url.includes('identitytoolkit')) {
-    return;
-  }
+  // Ignorar peticiones que no sean GET
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
-      .then((networkResponse) => {
-        // Guarda una copia de la respuesta fresca en el caché
-        if (event.request.method === 'GET' && networkResponse.status === 200) {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseClone);
-          });
+    caches.match(event.request)
+      .then((cachedResponse) => {
+        if (cachedResponse) {
+          // Devuelve el archivo local inmediatamente
+          return cachedResponse;
         }
-        return networkResponse;
-      })
-      .catch(() => {
-        // Si no hay red, sirve la versión de la memoria local
-        return caches.match(event.request);
+        // Si por alguna razón no está en caché, intenta ir a la red
+        return fetch(event.request).catch(() => {
+          // Fallback opcional si la red falla y no hay caché
+          console.warn('[Service Worker] No se pudo obtener el recurso:', event.request.url);
+        });
       })
   );
 });
