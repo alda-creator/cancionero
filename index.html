@@ -408,15 +408,13 @@
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; gap: 6px; flex-wrap: wrap;">  
       <button class="btn-action" onclick="showList()">← Volver</button>  
       
-      <!-- BOTONES DE NAVEGACIÓN DE CANCIONES (SIGUIENTE / ANTERIOR) -->
-      <div style="display: flex; gap: 4px;">
-        <button class="btn-action" onclick="navigateSetlist(-1)">⏮️ Ant</button>
-        <button class="btn-action" onclick="navigateSetlist(1)">Sig ⏭️</button>
-      </div>
-
-      <div style="display: flex; gap: 6px;">  
+      <div style="display: flex; gap: 6px; align-items: center;">  
+        <!-- BOTONES DE NAVEGACIÓN EN EL VISOR (SOLO VISIBLES EN MI SET) -->
+        <div class="nav-setlist-btns" style="display: none; gap: 4px;">
+          <button class="btn-action" onclick="navigateSetlist(-1)">⏮️ Ant</button>
+          <button class="btn-action" onclick="navigateSetlist(1)">Sig ⏭️</button>
+        </div>
         <button class="btn-action primary" onclick="openLiveView()">📺 En Vivo</button>  
-        <button class="btn-action" onclick="toggleNotation()" id="notation-btn">C»Do</button>  
       </div>  
     </div>  
 
@@ -439,14 +437,16 @@
       </div>  
     </div>  
 
+    <!-- BARRA REORGANIZADA: AUTO-SCROLL, C»Do Y VELOCIDAD -->
     <div class="controls-bar">  
-      <button class="btn-action primary" id="scroll-toggle-btn" onclick="toggleAutoScroll()">▶ Auto-Scroll</button>  
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <button class="btn-action primary" id="scroll-toggle-btn" onclick="toggleAutoScroll()">▶ Auto-Scroll</button>  
+        <button class="btn-action" onclick="toggleNotation()" id="notation-btn">C»Do</button>  
+      </div>
       <div style="display: flex; align-items: center; gap: 6px;">  
         <button class="btn-action" onclick="changeScrollSpeed(-1)">-</button>  
         <span id="scroll-speed-display" style="font-size: 13px; font-weight: bold; width: 20px; text-align: center;">1x</span>  
         <button class="btn-action" onclick="changeScrollSpeed(1)">+</button>  
-        <button class="btn-action" onclick="changeFontSize(-1)">A-</button>  
-        <button class="btn-action" onclick="changeFontSize(1)">A+</button>  
       </div>  
     </div>  
 
@@ -497,13 +497,13 @@
   <div class="live-header">
     <button class="btn-action" id="live-exit-btn" onclick="closeLiveView()">← Salir de En Vivo</button>
     
-    <!-- CONTROLES DE NAVEGACIÓN EN MODO EN VIVO -->
-    <div style="display: flex; gap: 4px;">
-      <button class="btn-action" onclick="navigateSetlist(-1)">⏮️ Ant</button>
-      <button class="btn-action" onclick="navigateSetlist(1)">Sig ⏭️</button>
-    </div>
-
+    <!-- CONTROLES DE NAVEGACIÓN EN MODO EN VIVO (SOLO VISIBLES EN MI SET) -->
     <div style="display: flex; gap: 8px; align-items: center;">
+      <div class="nav-setlist-btns" style="display: none; gap: 4px;">
+        <button class="btn-action" onclick="navigateSetlist(-1)">⏮️ Ant</button>
+        <button class="btn-action" onclick="navigateSetlist(1)">Sig ⏭️</button>
+      </div>
+
       <button class="btn-action primary" id="live-scroll-btn" onclick="toggleLiveScroll()">▶ Auto-Scroll</button>
       <button class="btn-action" onclick="changeLiveSpeed(-1)">-</button>
       <span id="live-speed-display" style="font-size: 13px; font-weight: bold;">1x</span>
@@ -552,7 +552,6 @@
   let scrollInterval = null;  
   let isScrolling = false;  
   let scrollSpeed = 1;  
-  let currentFontSize = 16;  
   let sortableInstance = null;
 
   // Variables para el Modo Director (PeerJS)
@@ -624,10 +623,8 @@
     
     let listToRender = [];
     if (currentTab === 'set') {
-      // Mantener el orden exacto guardado en songSetIds
       listToRender = songSetIds.map(id => songs.find(s => s.id === id)).filter(Boolean);
     } else {
-      // Lista completa en orden alfabético
       listToRender = [...songs].sort((a,b) => a.title.localeCompare(b.title));
     }
 
@@ -673,7 +670,6 @@
       container.appendChild(card);  
     });  
 
-    // Habilitar o deshacer el arrastre táctil según la pestaña activa
     initOrDestroySortable();
   }  
 
@@ -684,7 +680,6 @@
       sortableInstance = null;
     }
 
-    // Solo se permite arrastrar y reordenar dentro de "Mi Set"
     if (currentTab === 'set') {
       sortableInstance = new Sortable(container, {
         animation: 150,
@@ -906,34 +901,33 @@
     currentSong = songs.find(s => s.id === id);  
     if (!currentSong) return;  
     currentTransposeSteps = 0;  
+
+    // Ocultar o mostrar botones de Siguiente y Anterior dependiendo si venimos de la pestaña Mi Set
+    const navBtns = document.querySelectorAll('.nav-setlist-btns');
+    navBtns.forEach(el => {
+      el.style.display = (currentTab === 'set') ? 'flex' : 'none';
+    });
+
     document.getElementById('list-view').style.display = 'none';  
     document.getElementById('song-editor').style.display = 'none';  
     document.getElementById('song-viewer').style.display = 'block';  
     document.getElementById('admin-actions').style.display = 'none';
     document.getElementById('song-title').innerText = currentSong.title;  
     document.getElementById('song-author').innerText = currentSong.author || 'Iglesia de Dios 7d';  
-    document.getElementById('song-content').style.fontSize = currentFontSize + 'px';  
     renderTransposedContent();  
     window.scrollTo(0, 0);  
   }  
 
-  // NAVEGACIÓN ENTRE CANCIONES DEL SETLIST
+  // NAVEGACIÓN EXCLUSIVA PARA CANCIONES DEL SETLIST
   function navigateSetlist(direction) {
-    let currentList = [];
-    if (songSetIds.length > 0) {
-      currentList = songSetIds;
-    } else {
-      currentList = songs.map(s => s.id);
-    }
+    if (currentTab !== 'set' || songSetIds.length === 0 || !currentSong) return;
 
-    if (currentList.length === 0 || !currentSong) return;
-
-    const currentIndex = currentList.indexOf(currentSong.id);
+    const currentIndex = songSetIds.indexOf(currentSong.id);
     if (currentIndex === -1) return;
 
     const targetIndex = currentIndex + direction;
-    if (targetIndex >= 0 && targetIndex < currentList.length) {
-      const targetId = currentList[targetIndex];
+    if (targetIndex >= 0 && targetIndex < songSetIds.length) {
+      const targetId = songSetIds[targetIndex];
       openSong(targetId);
       if (document.getElementById('live-screen').style.display !== 'none') {
         buildBlocksHTML(document.getElementById('live-body'));
@@ -1167,18 +1161,13 @@
     if (isScrolling) startAutoScroll(document.getElementById('live-screen'));  
   }  
 
-  function changeFontSize(delta) {  
-    currentFontSize = Math.max(12, Math.min(28, currentFontSize + delta));  
-    document.getElementById('song-content').style.fontSize = currentFontSize + 'px';  
-  }  
-
   function toggleDarkMode() {  
     document.body.classList.toggle('light-mode');  
     const isLight = document.body.classList.contains('light-mode');  
     document.getElementById('theme-btn').innerText = isLight ? '☀️' : '🌙';  
   }  
 
-  // --- LÓGICA COMPLETA MODO DIRECTOR (PEERJS) ---
+  // --- LÓGICA MODO DIRECTOR (PEERJS) ---
 
   function changeSyncRole(role) {
     currentRole = role;
@@ -1240,7 +1229,6 @@
     });
 
     peer.on('error', (err) => {
-      console.log("Error PeerJS Director:", err);
       if (err.type === 'unavailable-id') {
         initDirectorPeer();
       }
