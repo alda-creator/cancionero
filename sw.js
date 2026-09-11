@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cancionero-cache-v2';
+const CACHE_NAME = 'cancionero-cache-v3';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -17,7 +17,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activación y limpieza de cachés antiguas
+// Activación y limpieza de cachés antiguas (elimina v2, v1, etc.)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -33,11 +33,26 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Intercepción de peticiones para servir desde el caché
+// Estrategia Stale-While-Revalidate: Carga instantánea offline + actualización en segundo plano
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request);
+    caches.match(event.request).then((cachedResponse) => {
+      // 1. Petición a la red en segundo plano para actualizar la caché silenciosamente
+      const fetchPromise = fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(event.request, networkResponse.clone());
+            });
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          // Ignorar errores de red en modo offline
+        });
+
+      // 2. Sirve de inmediato lo que está en caché (0 delay), o espera a la red si es un archivo nuevo
+      return cachedResponse || fetchPromise;
     })
   );
 });
