@@ -11,8 +11,8 @@
   <link rel="manifest" href="manifest.json">  
   <meta name="theme-color" content="#0b0f19">  
 
-  <!-- Librería PeerJS para Modo Director sin servidor backend adicional -->
-  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <!-- Librería PeerJS desde ruta local en la PWA -->
+  <script src="js/peerjs.min.js"></script>
 
   <style>  
     :root {  
@@ -532,11 +532,7 @@
   let musicianConns = [];
   let currentRole = 'none';
   let myRoomCode = '';
-  let isRemoteScroll = false; // Evita bucles infinitos al sincronizar scroll
-
-  if ('serviceWorker' in navigator) {  
-    navigator.serviceWorker.register('sw.js').catch(() => {});  
-  }  
+  let isRemoteScroll = false; 
 
   function listenToSongs() {  
     if (songsCollection) {  
@@ -963,13 +959,11 @@
     buildBlocksHTML(liveBody);
     liveScreen.style.display = 'flex';
 
-    // Ocultar botón de salir si es músico para evitar desconexión no deseada
     const exitBtn = document.getElementById('live-exit-btn');
     if (exitBtn) {
       exitBtn.style.display = (currentRole === 'musician') ? 'none' : 'inline-block';
     }
 
-    // Escuchar scroll dentro del contenedor de En Vivo (para el Director)
     liveScreen.onscroll = () => {
       if (currentRole === 'director' && !isRemoteScroll) {
         const scrollPercent = liveScreen.scrollTop / (liveScreen.scrollHeight - liveScreen.clientHeight);
@@ -1206,7 +1200,6 @@
         currentTransposeSteps = data.transpose;
         renderTransposedContent();
       }
-      // Músico entra directo a pantalla completa En Vivo
       if (currentRole === 'musician') {
         openLiveView();
       }
@@ -1257,6 +1250,15 @@
     }
   }
 
+  // --- REGISTRO DEL SERVICE WORKER PARA PWA ---
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => console.log('Service Worker listo:', reg.scope))
+        .catch((err) => console.error('Error en SW:', err));
+    });
+  }
+
   document.addEventListener('DOMContentLoaded', () => {  
     listenToSongs();  
     
@@ -1265,7 +1267,6 @@
       rawArea.addEventListener('scroll', syncEditorScroll);
     }
 
-    // Escuchar desplazamiento de ventana completo (para cuando el Director está en vista normal)
     window.addEventListener('scroll', () => {
       if (currentRole === 'director' && currentSong && !isRemoteScroll) {
         const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
