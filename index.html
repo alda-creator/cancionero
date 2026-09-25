@@ -1077,7 +1077,11 @@
       songs = songs.filter(s => s.id !== deleteId);  
       localStorage.setItem('church_songs', JSON.stringify(songs));  
       showList();  
-      // El ID de la canción es también el ID del documento de Firestore.\n      // Esto permite que las eliminaciones offline se reintenten al recuperar conexión.\n      if (songsCollection) {\n        songsCollection.doc(deleteId).delete().catch(() => {});\n      }  
+      // El ID de la canción es también el ID del documento de Firestore.
+      // Esto permite que las eliminaciones offline se reintenten al recuperar conexión.
+      if (songsCollection) {
+        songsCollection.doc(deleteId).delete().catch(() => {});
+      }  
     }  
   }  
 
