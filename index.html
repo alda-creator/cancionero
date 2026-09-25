@@ -1077,9 +1077,7 @@
       songs = songs.filter(s => s.id !== deleteId);  
       localStorage.setItem('church_songs', JSON.stringify(songs));  
       showList();  
-      if (songsCollection && !deleteId.startsWith('local_')) {  
-        songsCollection.doc(deleteId).delete().catch(() => {});  
-      }  
+      // El ID de la canción es también el ID del documento de Firestore.\n      // Esto permite que las eliminaciones offline se reintenten al recuperar conexión.\n      if (songsCollection) {\n        songsCollection.doc(deleteId).delete().catch(() => {});\n      }  
     }  
   }  
 
@@ -1089,9 +1087,17 @@
     const rawText = document.getElementById('edit-raw').value;  
     if (!title || !rawText.trim()) { alert("Ingresa un título y el contenido."); return; }  
 
-    const parsed = parseRawSongWithBlocks(rawText);  
-    const newId = editingSongId || ('local_' + Date.now());  
-    
+    const parsed = parseRawSongWithBlocks(rawText);
+
+    // Cada canción recibe una identidad estable que se conserva tanto localmente
+    // como en Firestore. Nunca usamos collection.add(), porque ese método genera
+    // un ID diferente y puede convertir una canción offline en un duplicado.
+    const newId = editingSongId || (
+      'song_' + (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now() + '_' + Math.random().toString(36).slice(2))
+    );
+
     const songData = { 
       id: newId, 
       title: title, 
@@ -1104,15 +1110,15 @@
     if (index >= 0) songs[index] = songData; else songs.push(songData);  
     localStorage.setItem('church_songs', JSON.stringify(songs));  
 
-    showList();  
-    if (songsCollection) {  
-      if (editingSongId && !editingSongId.startsWith('local_')) {  
-        songsCollection.doc(editingSongId).set(songData, { merge: true });  
-      } else {  
-        songsCollection.add(songData);  
-      }  
-    }  
-  }  
+    showList();
+
+    if (songsCollection) {
+      // Usamos exactamente el mismo ID local/remoto. Firestore Persistence
+      // puede mantener esta escritura pendiente cuando el dispositivo está offline
+      // y completarla al recuperar conexión.
+      songsCollection.doc(newId).set(songData, { merge: true }).catch(() => {});
+    }
+  }
 
   function toggleAutoScroll() { isScrolling ? stopAutoScroll() : startAutoScroll(window); }  
   function toggleLiveScroll() { 
