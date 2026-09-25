@@ -566,7 +566,16 @@
     if (songsCollection) {  
       songsCollection.orderBy('title').onSnapshot(snapshot => {  
         songs = [];  
-        snapshot.forEach(doc => songs.push({ id: doc.id, ...doc.data() }));  
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          // Conservamos la identidad lógica existente y, aparte, el ID real de Firestore.
+          // En canciones nuevas ambos valores son iguales.
+          songs.push({
+            ...data,
+            id: data.id || doc.id,
+            firestoreId: doc.id
+          });
+        });  
         localStorage.setItem('church_songs', JSON.stringify(songs));  
         if (document.getElementById('list-view').style.display !== 'none') renderCurrentTab();  
         updateSyncStatus();  
@@ -960,7 +969,9 @@
     const buttonsDiv = document.getElementById('field-buttons');
     buttonsDiv.innerHTML = '';
     
-    const availableKeys = Object.keys(currentSong).filter(k => k !== 'id' && k !== 'title' && k !== 'author' && k !== 'originalKey');
+    const availableKeys = Object.keys(currentSong).filter(k =>
+      k !== 'id' && k !== 'title' && k !== 'author' && k !== 'originalKey' && k !== 'firestoreId'
+    );
     
     if (availableKeys.length > 0) {
       container.style.display = 'block';
@@ -1073,14 +1084,18 @@
   async function deleteCurrentSong() {  
     if (!currentSong) return;  
     if (confirm(`¿Eliminar "${currentSong.title}"?`)) {  
-      const deleteId = currentSong.id;  
-      songs = songs.filter(s => s.id !== deleteId);  
-      localStorage.setItem('church_songs', JSON.stringify(songs));  
-      showList();  
-      // El ID de la canción es también el ID del documento de Firestore.
-      // Esto permite que las eliminaciones offline se reintenten al recuperar conexión.
+      const deleteId = currentSong.id;
+      const songToDelete = songs.find(s => s.id === deleteId);
+      const firestoreId = songToDelete?.firestoreId || deleteId;
+
+      songs = songs.filter(s => s.id !== deleteId);
+      localStorage.setItem('church_songs', JSON.stringify(songs));
+      showList();
+
+      // Para canciones nuevas, firestoreId e id son iguales.
+      // Para canciones antiguas, usamos el ID real del documento de Firestore.
       if (songsCollection) {
-        songsCollection.doc(deleteId).delete().catch(() => {});
+        songsCollection.doc(firestoreId).delete().catch(() => {});
       }  
     }  
   }  
@@ -1110,8 +1125,14 @@
       rawText: rawText 
     };  
 
-    const index = songs.findIndex(s => s.id === newId);  
-    if (index >= 0) songs[index] = songData; else songs.push(songData);  
+    const index = songs.findIndex(s => s.id === newId);
+    const existingSong = index >= 0 ? songs[index] : null;
+    const firestoreId = existingSong?.firestoreId || newId;
+    const localSongData = firestoreId === newId
+      ? songData
+      : { ...songData, firestoreId };
+
+    if (index >= 0) songs[index] = localSongData; else songs.push(localSongData);
     localStorage.setItem('church_songs', JSON.stringify(songs));  
 
     showList();
@@ -1120,7 +1141,7 @@
       // Usamos exactamente el mismo ID local/remoto. Firestore Persistence
       // puede mantener esta escritura pendiente cuando el dispositivo está offline
       // y completarla al recuperar conexión.
-      songsCollection.doc(newId).set(songData, { merge: true }).catch(() => {});
+      songsCollection.doc(firestoreId).set(songData, { merge: true }).catch(() => {});
     }
   }
 
