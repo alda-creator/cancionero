@@ -64,6 +64,7 @@
 
     .brand-title { font-size: 22px; font-weight: 800; color: var(--text); margin: 0; }
     .brand-subtitle { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+    .app-version { font-size: 11px; color: var(--text-muted); margin-top: 4px; opacity: 0.85; }
 
     .status-bar {  
       display: flex;  
@@ -167,6 +168,8 @@
 
     .viewer, .editor { display: none; }  
 
+    #song-viewer { touch-action: manipulation; }
+
     .song-header { margin-bottom: 16px; }  
     .song-title-large { font-size: 26px; font-weight: 800; margin: 0 0 6px 0; }  
     .song-meta-tags { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }  
@@ -224,6 +227,10 @@
       margin-bottom: 10px;
       text-transform: uppercase;
     }
+
+    .block-label.director-block-control { cursor: pointer; touch-action: manipulation; user-select: none; }
+    .song-block.remote-block-highlight { animation: remoteBlockHighlight 700ms ease-out; }
+    @keyframes remoteBlockHighlight { 0% { box-shadow: 0 0 0 3px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
 
     .line-pair {
       font-family: "Courier New", Courier, monospace;
@@ -355,6 +362,7 @@
       <div>
         <h1 class="brand-title">Cancionero Iglesia de Dios 7d</h1>  
         <div class="brand-subtitle">Alabanzas con transposición</div>
+        <div class="app-version">v1.1.14 · Director Mode</div>
       </div>
       <button class="btn-action" onclick="toggleDarkMode()" id="theme-btn">🌙</button>  
     </header>  
@@ -545,11 +553,16 @@
   let songs = [];  
   let songSetIds = JSON.parse(localStorage.getItem('church_song_set') || '[]');  
   let currentTab = 'all';  
-  let currentSong = null;  
+  let currentSong = null;
+  // Contexto de origen de la canción abierta: permite que los gestos
+  // respeten la navegación desde resultados de búsqueda.
+  let songViewOrigin = 'list';  
   let editingSongId = null;  
   let currentTransposeSteps = 0;  
-  let useLatinoNotation = false;  
-  let scrollInterval = null;  
+  let useLatinoNotation = localStorage.getItem('church_notation') === 'latino';  
+  let scrollAnimationFrame = null;  
+  let scrollAnimationLastTime = 0;  
+  let scrollTargetContainer = null;  
   let isScrolling = false;  
   let scrollSpeed = 1;  
   let sortableInstance = null;
@@ -560,13 +573,28 @@
   let musicianConns = [];
   let currentRole = 'none';
   let myRoomCode = '';
-  let isRemoteScroll = false; 
+  let isRemoteScroll = false;
+  let isRemoteBlockNavigation = false;
+  let remoteBlockNavigationFrame = null; 
+  // Estado explícito del seguimiento después de GO_TO_BLOCK.
+  // Debe existir desde el arranque: applyReadingPosition() lo consulta
+  // incluso antes de que se ejecute cualquier GO_TO_BLOCK.
+  let remoteBlockNavigationLock = false;
 
   function listenToSongs() {  
     if (songsCollection) {  
       songsCollection.orderBy('title').onSnapshot(snapshot => {  
         songs = [];  
-        snapshot.forEach(doc => songs.push({ id: doc.id, ...doc.data() }));  
+        snapshot.forEach(doc => {
+          const data = doc.data() || {};
+          // Conservamos la identidad lógica existente y, aparte, el ID real de Firestore.
+          // En canciones nuevas ambos valores son iguales.
+          songs.push({
+            ...data,
+            id: data.id || doc.id,
+            firestoreId: doc.id
+          });
+        });  
         localStorage.setItem('church_songs', JSON.stringify(songs));  
         if (document.getElementById('list-view').style.display !== 'none') renderCurrentTab();  
         updateSyncStatus();  
@@ -619,6 +647,16 @@
   }  
 
   function renderCurrentTab() {  
+    // Mi Set guarda únicamente IDs de canciones existentes. Esto evita que
+    // referencias antiguas o canciones eliminadas queden ocupando el contador
+    // y rompan la navegación del Setlist.
+    const validSongIds = new Set(songs.map(song => song.id));
+    const cleanedSetIds = songSetIds.filter(id => validSongIds.has(id));
+    if (cleanedSetIds.length !== songSetIds.length) {
+      songSetIds = cleanedSetIds;
+      localStorage.setItem('church_song_set', JSON.stringify(songSetIds));
+    }
+
     document.getElementById('set-count').innerText = songSetIds.length;  
     
     let listToRender = [];
@@ -680,13 +718,24 @@
       sortableInstance = null;
     }
 
-    if (currentTab === 'set') {
+    if (currentTab === 'set' && typeof Sortable !== 'undefined') {
       sortableInstance = new Sortable(container, {
         animation: 150,
         handle: '.drag-handle',
         onEnd: function () {
-          const newOrderIds = Array.from(container.children).map(card => card.dataset.id).filter(Boolean);
-          songSetIds = newOrderIds;
+          const visibleOrderIds = Array.from(container.children)
+            .map(card => card.dataset.id)
+            .filter(Boolean);
+
+          // Si hay una búsqueda activa, solo parte del Set está visible.
+          // Reordenamos esas canciones sin perder las que quedaron ocultas.
+          const visibleIds = new Set(visibleOrderIds);
+          let visibleIndex = 0;
+          songSetIds = songSetIds.map(id => {
+            if (!visibleIds.has(id)) return id;
+            return visibleOrderIds[visibleIndex++];
+          });
+
           localStorage.setItem('church_song_set', JSON.stringify(songSetIds));
         }
       });
@@ -790,6 +839,15 @@
     }
 
     if (currentBlock.lines.length > 0) blocks.push(currentBlock);
+
+    const blockOccurrences = new Map();
+    blocks.forEach(block => {
+      const labelKey = block.label.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'bloque';
+      const occurrence = (blockOccurrences.get(labelKey) || 0) + 1;
+      blockOccurrences.set(labelKey, occurrence);
+      block.id = /-\d+$/.test(labelKey) && occurrence === 1 ? labelKey : labelKey + '-' + occurrence;
+    });
+
     return { blocks: blocks, key: detectedKey };
   }
 
@@ -841,10 +899,21 @@
     parsed.blocks.forEach(block => {
       const blockDiv = document.createElement('div');
       blockDiv.className = 'song-block';
+      blockDiv.dataset.blockId = block.id;
 
       const label = document.createElement('div');
       label.className = 'block-label';
       label.innerText = block.label;
+      if (currentRole === 'director') {
+        label.classList.add('director-block-control');
+        label.setAttribute('role', 'button');
+        label.tabIndex = 0;
+        const sendGoToBlock = () => broadcastToMusicians({ type: 'GO_TO_BLOCK', blockId: block.id });
+        label.addEventListener('click', sendGoToBlock);
+        label.addEventListener('keydown', event => {
+          if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); sendGoToBlock(); }
+        });
+      }
       blockDiv.appendChild(label);
 
       block.lines.forEach(line => {
@@ -890,22 +959,42 @@
   }  
 
   function toggleNotation() {  
-    useLatinoNotation = !useLatinoNotation;  
+    useLatinoNotation = !useLatinoNotation;
+    localStorage.setItem('church_notation', useLatinoNotation ? 'latino' : 'anglo');
     document.getElementById('notation-btn').innerText = useLatinoNotation ? "Do»C" : "C»Do";  
     renderTransposedContent();  
   }  
 
-  function openSong(id) {  
-    broadcastToMusicians({ type: 'OPEN_SONG', songId: id, transpose: 0 });
+  function openSong(id, origin = null) {  
+    if (origin) {
+      songViewOrigin = origin;
+    } else {
+      const searchInput = document.getElementById('search-input');
+      songViewOrigin = (searchInput && searchInput.value.trim() !== '')
+        ? 'search'
+        : (currentTab === 'set' ? 'set' : 'list');
+    }
+
+    // Una canción abierta por el Director tiene un contexto propio.
+    // Nunca debe heredar Mi Set, búsqueda u otro contexto local del músico.
+    const isRemoteOpen = songViewOrigin === 'remote';
+
     stopAutoScroll();  
     currentSong = songs.find(s => s.id === id);  
     if (!currentSong) return;  
-    currentTransposeSteps = 0;  
+    currentTransposeSteps = 0;
 
-    // Ocultar o mostrar botones de Siguiente y Anterior dependiendo si venimos de la pestaña Mi Set
+    // Solo el Director origina órdenes para los demás dispositivos.
+    // El músico nunca debe convertir una orden recibida en una nueva orden.
+    if (!isRemoteOpen) {
+      broadcastToMusicians({ type: 'OPEN_SONG', songId: id, transpose: 0 });
+    }
+
+    // Los botones de Anterior/Siguiente pertenecen exclusivamente al
+    // contexto local de Mi Set. Un músico seguidor nunca los necesita.
     const navBtns = document.querySelectorAll('.nav-setlist-btns');
     navBtns.forEach(el => {
-      el.style.display = (currentTab === 'set') ? 'flex' : 'none';
+      el.style.display = (songViewOrigin === 'set') ? 'flex' : 'none';
     });
 
     document.getElementById('list-view').style.display = 'none';  
@@ -920,6 +1009,9 @@
 
   // NAVEGACIÓN EXCLUSIVA PARA CANCIONES DEL SETLIST
   function navigateSetlist(direction) {
+    // La navegación del Setlist es una función del Director o del usuario
+    // local. Los músicos reciben el resultado mediante OPEN_SONG.
+    if (currentRole === 'musician') return;
     if (currentTab !== 'set' || songSetIds.length === 0 || !currentSong) return;
 
     const currentIndex = songSetIds.indexOf(currentSong.id);
@@ -928,7 +1020,7 @@
     const targetIndex = currentIndex + direction;
     if (targetIndex >= 0 && targetIndex < songSetIds.length) {
       const targetId = songSetIds[targetIndex];
-      openSong(targetId);
+      openSong(targetId, 'set');
       if (document.getElementById('live-screen').style.display !== 'none') {
         buildBlocksHTML(document.getElementById('live-body'));
       }
@@ -960,7 +1052,9 @@
     const buttonsDiv = document.getElementById('field-buttons');
     buttonsDiv.innerHTML = '';
     
-    const availableKeys = Object.keys(currentSong).filter(k => k !== 'id' && k !== 'title' && k !== 'author' && k !== 'originalKey');
+    const availableKeys = Object.keys(currentSong).filter(k =>
+      k !== 'id' && k !== 'title' && k !== 'author' && k !== 'originalKey' && k !== 'firestoreId'
+    );
     
     if (availableKeys.length > 0) {
       container.style.display = 'block';
@@ -1035,6 +1129,330 @@
     el.style.display = el.style.display === 'flex' ? 'none' : 'flex';
   }
 
+  const SCROLL_SYNC_GUIDE_RATIO = 0.22;
+  const SCROLL_CORRECTION_INTERVAL = 250;
+  const SCROLL_CORRECTION_THRESHOLD = 28;
+  const SCROLL_CORRECTION_FACTOR = 0.32;
+  let lastReadingSyncAt = 0;
+  let lastRemoteCorrectionAt = 0;
+
+  function getReadingElements(container) {
+    return container === document.getElementById('live-screen')
+      ? Array.from(document.querySelectorAll('#live-body .line-pair'))
+      : Array.from(document.querySelectorAll('#song-content .line-pair'));
+  }
+
+  function getReadingAnchor(container) {
+    const elements = getReadingElements(container);
+    if (!elements.length) return null;
+
+    const viewportHeight = container === window ? window.innerHeight : container.clientHeight;
+    const viewportTop = container === window ? 0 : container.getBoundingClientRect().top;
+    const guideY = viewportTop + viewportHeight * SCROLL_SYNC_GUIDE_RATIO;
+
+    let index = elements.findIndex(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.bottom >= guideY;
+    });
+
+    if (index < 0) index = elements.length - 1;
+
+    const element = elements[index];
+    const rect = element.getBoundingClientRect();
+    const height = Math.max(rect.height, 1);
+    const offsetRatio = Math.max(0, Math.min(1, (guideY - rect.top) / height));
+    const block = element.closest('.song-block');
+
+    return {
+      lineIndex: index,
+      offsetRatio,
+      blockId: block?.dataset.blockId || null
+    };
+  }
+
+  function getScrollPixelsPerSecond(speed) {
+    const normalizedSpeed = Math.max(1, Math.min(5, Number(speed) || 1));
+    return 24 * normalizedSpeed;
+  }
+
+  function getContainerScrollTop(container) {
+    return container === window ? window.scrollY : container.scrollTop;
+  }
+
+  function setContainerScrollTop(container, value) {
+    const maxScroll = container === window
+      ? Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+      : Math.max(0, container.scrollHeight - container.clientHeight);
+    const next = Math.max(0, Math.min(maxScroll, value));
+    if (container === window) window.scrollTo({ top: next, behavior: 'auto' });
+    else container.scrollTop = next;
+  }
+
+  function broadcastReadingPosition(container, force = false) {
+    if (currentRole !== 'director' || isRemoteScroll) return;
+
+    const now = Date.now();
+    if (!force && now - lastReadingSyncAt < SCROLL_CORRECTION_INTERVAL) return;
+    lastReadingSyncAt = now;
+
+    const anchor = getReadingAnchor(container);
+    if (anchor) {
+      broadcastToMusicians({
+        type: 'READING_POSITION',
+        ...anchor,
+        source: isScrolling ? 'auto' : 'manual'
+      });
+    }
+  }
+
+  function getDesiredScrollForReadingPosition(container, data) {
+    const elements = getReadingElements(container);
+    if (!elements.length || data.lineIndex === undefined) return null;
+
+    const index = Math.max(0, Math.min(elements.length - 1, Number(data.lineIndex)));
+    const element = elements[index];
+    if (!element) return null;
+
+    const viewportHeight = container === window ? window.innerHeight : container.clientHeight;
+    const viewportTop = container === window ? 0 : container.getBoundingClientRect().top;
+    const guideY = viewportTop + viewportHeight * SCROLL_SYNC_GUIDE_RATIO;
+    const ratio = Math.max(0, Math.min(1, Number(data.offsetRatio) || 0));
+    const rect = element.getBoundingClientRect();
+
+    return getContainerScrollTop(container)
+      + (rect.top - viewportTop)
+      + (ratio * Math.max(rect.height, 1))
+      - (guideY - viewportTop);
+  }
+
+  function applyReadingPosition(container, data) {
+    if (isRemoteBlockNavigation) return;
+
+    // Después de GO_TO_BLOCK, las posiciones que todavía pertenecen al bloque
+    // anterior del Director no deben devolver al músico a donde estaba.
+    // El bloqueo se libera cuando el Director realmente llega al bloque solicitado.
+    if (remoteBlockNavigationLock) {
+      // Las posiciones que ya estaban en tránsito antes de GO_TO_BLOCK no
+      // pueden deshacer la orden. Una nueva interacción manual del Director
+      // sí es una orden válida y libera el bloqueo.
+      if (data.source === 'manual') {
+        remoteBlockNavigationLock = false;
+      } else {
+        return;
+      }
+    }
+
+    const desiredScroll = getDesiredScrollForReadingPosition(container, data);
+    if (desiredScroll === null) return;
+
+    const currentScroll = getContainerScrollTop(container);
+    const error = desiredScroll - currentScroll;
+    const now = Date.now();
+
+    // Durante el auto-scroll local corregimos solo una fracción del desfase.
+    // Esto evita los saltos de v1.1.8 y conserva el movimiento continuo.
+    if (remoteAutoScrollActive) {
+      // Nunca corregimos cambiando scrollTop de golpe. El desfase se convierte
+      // en una pequeña velocidad adicional que el motor local absorbe suavemente.
+      if (Math.abs(error) < SCROLL_CORRECTION_THRESHOLD) {
+        remoteScrollCorrectionVelocity *= 0.7;
+        if (Math.abs(remoteScrollCorrectionVelocity) < 0.5) remoteScrollCorrectionVelocity = 0;
+        return;
+      }
+      if (now - lastRemoteCorrectionAt >= SCROLL_CORRECTION_INTERVAL) {
+        lastRemoteCorrectionAt = now;
+        remoteScrollCorrectionVelocity = Math.max(-12, Math.min(12, error * 0.35));
+      }
+      return;
+    }
+
+    // Si el seguimiento remoto no está activo, mantenemos la compatibilidad
+    // con una corrección directa para una posición enviada puntualmente.
+    isRemoteScroll = true;
+    setContainerScrollTop(container, desiredScroll);
+    setTimeout(() => { isRemoteScroll = false; }, 30);
+  }
+
+  let scrollAnimationCarry = 0;
+
+  function startLocalScrollMotor(targetContainer, speed, broadcastStart = false) {
+    if (!targetContainer) return;
+
+    if (scrollAnimationFrame) cancelAnimationFrame(scrollAnimationFrame);
+    scrollAnimationFrame = null;
+
+    scrollTargetContainer = targetContainer;
+    scrollAnimationLastTime = performance.now();
+    scrollAnimationCarry = 0;
+    isScrolling = true;
+
+    const tick = (now) => {
+      if (!isScrolling || scrollTargetContainer !== targetContainer) return;
+
+      const elapsed = Math.min(64, Math.max(0, now - scrollAnimationLastTime));
+      scrollAnimationLastTime = now;
+
+      const basePixels = getScrollPixelsPerSecond(speed);
+      const correctionPixels = remoteAutoScrollActive && targetContainer === remoteScrollContainer
+        ? remoteScrollCorrectionVelocity
+        : 0;
+
+      // Acumulamos fracciones y aplicamos el movimiento cuando existe al menos
+      // 1 px real. Así 1x/2x no pueden parecer detenidos por redondeos.
+      scrollAnimationCarry += (basePixels + correctionPixels) * elapsed / 1000;
+      const pixels = Math.trunc(scrollAnimationCarry);
+      scrollAnimationCarry -= pixels;
+
+      const before = getContainerScrollTop(targetContainer);
+      const maxScroll = targetContainer === window
+        ? Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+        : Math.max(0, targetContainer.scrollHeight - targetContainer.clientHeight);
+      const next = Math.min(maxScroll, before + pixels);
+
+      if (next !== before) {
+        if (targetContainer === window) window.scrollTo({ top: next, behavior: 'auto' });
+        else targetContainer.scrollTop = next;
+      }
+
+      if (currentRole === 'director') broadcastReadingPosition(targetContainer);
+      if (next >= maxScroll - 1) {
+        stopAutoScroll(true);
+        return;
+      }
+
+      scrollAnimationFrame = requestAnimationFrame(tick);
+    };
+
+    scrollAnimationFrame = requestAnimationFrame(tick);
+
+    if (broadcastStart) {
+      broadcastToMusicians({ type: 'SCROLL_START', speed: Math.max(1, Math.min(5, Number(speed) || 1)) });
+    }
+  }
+
+  function startFollowerAutoScroll(speed) {
+    remoteScrollCorrectionVelocity = 0;
+    remoteAutoScrollActive = true;
+    remoteScrollSpeed = Math.max(1, Math.min(5, Number(speed) || 1));
+    const isLive = document.getElementById('live-screen').style.display !== 'none';
+    remoteScrollContainer = isLive ? document.getElementById('live-screen') : window;
+    startLocalScrollMotor(remoteScrollContainer, remoteScrollSpeed, false);
+  }
+
+  function stopFollowerAutoScroll() {
+    remoteScrollCorrectionVelocity = 0;
+    remoteAutoScrollActive = false;
+    remoteScrollContainer = null;
+    if (currentRole === 'musician' && scrollAnimationFrame) {
+      cancelAnimationFrame(scrollAnimationFrame);
+      scrollAnimationFrame = null;
+      isScrolling = false;
+    }
+  }
+
+  function toggleAutoScroll() {
+    isScrolling ? stopAutoScroll() : startAutoScroll(window);
+  }
+
+  function toggleLiveScroll() {
+    const screen = document.getElementById('live-screen');
+    isScrolling ? stopAutoScroll() : startAutoScroll(screen);
+  }
+
+  function startAutoScroll(targetContainer) {
+    stopAutoScroll(true);
+    startLocalScrollMotor(targetContainer, scrollSpeed, true);
+    const btn = document.getElementById('scroll-toggle-btn');
+    const liveBtn = document.getElementById('live-scroll-btn');
+    if (btn) btn.innerText = "⏸ Pausa";
+    if (liveBtn) liveBtn.innerText = "⏸ Pausa";
+  }
+
+  function stopAutoScroll(silent = false) {
+    isScrolling = false;
+    scrollTargetContainer = null;
+    if (scrollAnimationFrame) cancelAnimationFrame(scrollAnimationFrame);
+    scrollAnimationFrame = null;
+
+    const btn = document.getElementById('scroll-toggle-btn');
+    const liveBtn = document.getElementById('live-scroll-btn');
+    if (btn) btn.innerText = "▶ Auto-Scroll";
+    if (liveBtn) liveBtn.innerText = "▶ Auto-Scroll";
+
+    if (!silent) broadcastToMusicians({ type: 'SCROLL_STOP' });
+  }
+
+  function changeScrollSpeed(delta) {
+    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));
+    document.getElementById('scroll-speed-display').innerText = scrollSpeed + 'x';
+    if (isScrolling) startAutoScroll(window);
+    else if (currentRole === 'director') broadcastToMusicians({ type: 'SCROLL_SPEED', speed: scrollSpeed });
+  }
+
+  function changeLiveSpeed(delta) {
+    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));
+    document.getElementById('live-speed-display').innerText = scrollSpeed + 'x';
+    if (isScrolling) startAutoScroll(document.getElementById('live-screen'));
+    else if (currentRole === 'director') broadcastToMusicians({ type: 'SCROLL_SPEED', speed: scrollSpeed });
+  }
+
+
+  function goToRemoteBlock(blockId) {
+    if (currentRole !== 'musician' || !blockId) return;
+    const liveScreen = document.getElementById('live-screen');
+    const liveBody = document.getElementById('live-body');
+    const songContent = document.getElementById('song-content');
+    const isLive = liveScreen && liveScreen.style.display !== 'none';
+    const container = isLive ? liveScreen : window;
+    const root = isLive ? liveBody : songContent;
+    if (!root) return;
+    const block = Array.from(root.querySelectorAll('.song-block')).find(item => item.dataset.blockId === blockId);
+    if (!block) return;
+    if (remoteBlockNavigationFrame) cancelAnimationFrame(remoteBlockNavigationFrame);
+    const resumeFollowerAfterBlock = remoteAutoScrollActive;
+    const followerSpeedAfterBlock = remoteScrollSpeed;
+    if (resumeFollowerAfterBlock) stopFollowerAutoScroll();
+
+    // Mantener este bloqueo hasta que el Director llegue realmente al bloque
+    // solicitado evita que una READING_POSITION antigua deshaga GO_TO_BLOCK.
+    remoteBlockNavigationLock = true;
+
+    isRemoteBlockNavigation = true;
+    isRemoteScroll = true;
+    const viewportHeight = container === window ? window.innerHeight : container.clientHeight;
+    const startScroll = container === window ? window.scrollY : container.scrollTop;
+    const viewportTop = container === window ? 0 : container.getBoundingClientRect().top;
+    const blockTop = block.getBoundingClientRect().top - viewportTop + startScroll;
+    // Alinear el encabezado con la misma guía de lectura de la sincronización.
+    const guideOffset = viewportHeight * SCROLL_SYNC_GUIDE_RATIO;
+    const targetScroll = Math.max(0, blockTop - guideOffset);
+    const startTime = performance.now();
+    const animate = now => {
+      const progress = Math.min(1, (now - startTime) / 400);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const nextScroll = startScroll + (targetScroll - startScroll) * eased;
+      if (container === window) window.scrollTo(0, nextScroll); else container.scrollTop = nextScroll;
+      if (progress < 1) remoteBlockNavigationFrame = requestAnimationFrame(animate);
+      else {
+        remoteBlockNavigationFrame = null;
+        isRemoteBlockNavigation = false;
+        isRemoteScroll = false;
+        remoteScrollCorrectionVelocity = 0;
+        block.classList.remove('remote-block-highlight');
+        void block.offsetWidth;
+        block.classList.add('remote-block-highlight');
+        setTimeout(() => block.classList.remove('remote-block-highlight'), 700);
+
+        // Si el Director tenía Auto-Scroll activo, el músico continúa desde
+        // el bloque solicitado, no desde la posición anterior.
+        if (resumeFollowerAfterBlock) {
+          startFollowerAutoScroll(followerSpeedAfterBlock);
+        }
+      }
+    };
+    remoteBlockNavigationFrame = requestAnimationFrame(animate);
+  }
+
   function openLiveView() {
     if (!currentSong) return;
     const liveScreen = document.getElementById('live-screen');
@@ -1050,10 +1468,13 @@
 
     liveScreen.onscroll = () => {
       if (currentRole === 'director' && !isRemoteScroll) {
-        const scrollPercent = liveScreen.scrollTop / (liveScreen.scrollHeight - liveScreen.clientHeight);
-        broadcastToMusicians({ type: 'MANUAL_SCROLL', percent: scrollPercent });
+        broadcastReadingPosition(liveScreen);
       }
     };
+
+    if (currentRole === 'director') {
+      setTimeout(() => broadcastReadingPosition(liveScreen, true), 0);
+    }
   }
 
   function closeLiveView() {
@@ -1063,7 +1484,11 @@
 
   function showList() {  
     broadcastToMusicians({ type: 'CLOSE_SONG' });
-    stopAutoScroll();  
+    stopAutoScroll();
+    // Al volver a la lista ya no hay una canción abierta.
+    // Esto evita que los gestos de navegación actúen sobre la lista de Mi Set.
+    currentSong = null;
+    songViewOrigin = 'list';
     document.getElementById('list-view').style.display = 'block';  
     document.getElementById('song-viewer').style.display = 'none';  
     document.getElementById('song-editor').style.display = 'none';  
@@ -1073,12 +1498,20 @@
   async function deleteCurrentSong() {  
     if (!currentSong) return;  
     if (confirm(`¿Eliminar "${currentSong.title}"?`)) {  
-      const deleteId = currentSong.id;  
-      songs = songs.filter(s => s.id !== deleteId);  
-      localStorage.setItem('church_songs', JSON.stringify(songs));  
-      showList();  
-      if (songsCollection && !deleteId.startsWith('local_')) {  
-        songsCollection.doc(deleteId).delete().catch(() => {});  
+      const deleteId = currentSong.id;
+      const songToDelete = songs.find(s => s.id === deleteId);
+      const firestoreId = songToDelete?.firestoreId || deleteId;
+
+      songs = songs.filter(s => s.id !== deleteId);
+      songSetIds = songSetIds.filter(id => id !== deleteId);
+      localStorage.setItem('church_songs', JSON.stringify(songs));
+      localStorage.setItem('church_song_set', JSON.stringify(songSetIds));
+      showList();
+
+      // Para canciones nuevas, firestoreId e id son iguales.
+      // Para canciones antiguas, usamos el ID real del documento de Firestore.
+      if (songsCollection) {
+        songsCollection.doc(firestoreId).delete().catch(() => {});
       }  
     }  
   }  
@@ -1089,9 +1522,17 @@
     const rawText = document.getElementById('edit-raw').value;  
     if (!title || !rawText.trim()) { alert("Ingresa un título y el contenido."); return; }  
 
-    const parsed = parseRawSongWithBlocks(rawText);  
-    const newId = editingSongId || ('local_' + Date.now());  
-    
+    const parsed = parseRawSongWithBlocks(rawText);
+
+    // Cada canción recibe una identidad estable que se conserva tanto localmente
+    // como en Firestore. Nunca usamos collection.add(), porque ese método genera
+    // un ID diferente y puede convertir una canción offline en un duplicado.
+    const newId = editingSongId || (
+      'song_' + (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now() + '_' + Math.random().toString(36).slice(2))
+    );
+
     const songData = { 
       id: newId, 
       title: title, 
@@ -1100,66 +1541,25 @@
       rawText: rawText 
     };  
 
-    const index = songs.findIndex(s => s.id === newId);  
-    if (index >= 0) songs[index] = songData; else songs.push(songData);  
+    const index = songs.findIndex(s => s.id === newId);
+    const existingSong = index >= 0 ? songs[index] : null;
+    const firestoreId = existingSong?.firestoreId || newId;
+    const localSongData = firestoreId === newId
+      ? songData
+      : { ...songData, firestoreId };
+
+    if (index >= 0) songs[index] = localSongData; else songs.push(localSongData);
     localStorage.setItem('church_songs', JSON.stringify(songs));  
 
-    showList();  
-    if (songsCollection) {  
-      if (editingSongId && !editingSongId.startsWith('local_')) {  
-        songsCollection.doc(editingSongId).set(songData, { merge: true });  
-      } else {  
-        songsCollection.add(songData);  
-      }  
-    }  
-  }  
+    showList();
 
-  function toggleAutoScroll() { isScrolling ? stopAutoScroll() : startAutoScroll(window); }  
-  function toggleLiveScroll() { 
-    const screen = document.getElementById('live-screen');
-    isScrolling ? stopAutoScroll() : startAutoScroll(screen); 
+    if (songsCollection) {
+      // Usamos exactamente el mismo ID local/remoto. Firestore Persistence
+      // puede mantener esta escritura pendiente cuando el dispositivo está offline
+      // y completarla al recuperar conexión.
+      songsCollection.doc(firestoreId).set(songData, { merge: true }).catch(() => {});
+    }
   }
-
-  function startAutoScroll(targetContainer) {  
-    stopAutoScroll();  
-    isScrolling = true;  
-    const btn = document.getElementById('scroll-toggle-btn');  
-    const liveBtn = document.getElementById('live-scroll-btn');
-    if (btn) btn.innerText = "⏸ Pausa";  
-    if (liveBtn) liveBtn.innerText = "⏸ Pausa";
-
-    const delay = Math.max(10, 50 - (scrollSpeed * 8));  
-    scrollInterval = setInterval(() => {  
-      if (targetContainer === window) {
-        window.scrollBy(0, 1);  
-      } else {
-        targetContainer.scrollTop += 1;
-      }
-    }, delay);  
-    broadcastToMusicians({ type: 'SCROLL_START' });
-  }  
-
-  function stopAutoScroll() {  
-    isScrolling = false;  
-    if (scrollInterval) clearInterval(scrollInterval);  
-    const btn = document.getElementById('scroll-toggle-btn');  
-    const liveBtn = document.getElementById('live-scroll-btn');
-    if (btn) btn.innerText = "▶ Auto-Scroll";  
-    if (liveBtn) liveBtn.innerText = "▶ Auto-Scroll";
-    broadcastToMusicians({ type: 'SCROLL_STOP' });
-  }  
-
-  function changeScrollSpeed(delta) {  
-    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));  
-    document.getElementById('scroll-speed-display').innerText = scrollSpeed + 'x';  
-    if (isScrolling) startAutoScroll(window);  
-  }  
-
-  function changeLiveSpeed(delta) {  
-    scrollSpeed = Math.max(1, Math.min(5, scrollSpeed + delta));  
-    document.getElementById('live-speed-display').innerText = scrollSpeed + 'x';  
-    if (isScrolling) startAutoScroll(document.getElementById('live-screen'));  
-  }  
 
   function toggleDarkMode() {  
     document.body.classList.toggle('light-mode');  
@@ -1170,6 +1570,8 @@
   // --- LÓGICA MODO DIRECTOR (PEERJS) ---
 
   function changeSyncRole(role) {
+    if (currentRole === 'musician' && role !== 'musician') stopFollowerAutoScroll();
+    if (currentRole === 'director' && role !== 'director') stopAutoScroll(true);
     currentRole = role;
     const dirCtrl = document.getElementById('director-controls');
     const musCtrl = document.getElementById('musician-controls');
@@ -1190,6 +1592,16 @@
       msg.innerText = "Ingresa el código que te proporcione el Director";
     } else {
       msg.innerText = "";
+    }
+
+    // Si el rol cambia con una canción ya abierta, reconstruimos los bloques
+    // para que los encabezados reflejen inmediatamente el nuevo rol.
+    if (currentSong) {
+      buildBlocksHTML(document.getElementById('song-content'));
+      const liveScreen = document.getElementById('live-screen');
+      if (liveScreen && liveScreen.style.display !== 'none') {
+        buildBlocksHTML(document.getElementById('live-body'));
+      }
     }
   }
 
@@ -1270,17 +1682,24 @@
       document.getElementById('sync-status-msg').style.color = "var(--danger)";
     });
   }
-
   function handleDirectorCommand(data) {
+    if (currentRole !== 'musician' || !data || !data.type) return;
     if (data.type === 'OPEN_SONG') {
-      openSong(data.songId);
+      // El Director define la canción y el tono, pero cada dispositivo
+      // conserva su propia preferencia de notación (C-D-E o Do-Re-Mi).
+      openSong(data.songId, 'remote');
+
       if (data.transpose !== undefined) {
         currentTransposeSteps = data.transpose;
         renderTransposedContent();
       }
+
       if (currentRole === 'musician') {
+        // El músico entra directamente a En Vivo y queda como seguidor.
         openLiveView();
       }
+    } else if (data.type === 'GO_TO_BLOCK') {
+      goToRemoteBlock(data.blockId);
     } else if (data.type === 'TRANSPOSE') {
       currentTransposeSteps = data.steps;
       renderTransposedContent();
@@ -1288,12 +1707,28 @@
         buildBlocksHTML(document.getElementById('live-body'));
       }
     } else if (data.type === 'SCROLL_START') {
+      if (currentRole === 'musician') {
+        remoteBlockNavigationLock = false;
+        startFollowerAutoScroll(data.speed || 1);
+      }
+    } else if (data.type === 'SCROLL_STOP') {
+      if (currentRole === 'musician') {
+        remoteBlockNavigationLock = false;
+        stopFollowerAutoScroll();
+      }
+    } else if (data.type === 'SCROLL_SPEED') {
+      if (currentRole === 'musician' && remoteAutoScrollActive) {
+        remoteScrollSpeed = Math.max(1, Math.min(5, Number(data.speed) || 1));
+        startFollowerAutoScroll(remoteScrollSpeed);
+      }
+    } else if (data.type === 'READING_POSITION') {
       const isLive = document.getElementById('live-screen').style.display !== 'none';
       const target = isLive ? document.getElementById('live-screen') : window;
-      if (!isScrolling) startAutoScroll(target);
-    } else if (data.type === 'SCROLL_STOP') {
-      stopAutoScroll();
+      applyReadingPosition(target, data);
     } else if (data.type === 'MANUAL_SCROLL') {
+      // Compatibilidad con sesiones anteriores: si llega el formato viejo,
+      // seguimos aplicando el porcentaje. Las sesiones nuevas usan
+      // READING_POSITION.
       isRemoteScroll = true;
       const isLive = document.getElementById('live-screen').style.display !== 'none';
       if (isLive) {
@@ -1303,7 +1738,7 @@
         const targetY = data.percent * (document.documentElement.scrollHeight - window.innerHeight);
         window.scrollTo({ top: targetY });
       }
-      setTimeout(() => { isRemoteScroll = false; }, 50);
+      setTimeout(() => { isRemoteScroll = false; }, 80);
     } else if (data.type === 'CLOSE_SONG') {
       if (currentRole === 'musician') {
         closeLiveView();
@@ -1328,10 +1763,186 @@
     }
   }
 
+  // --- GESTOS TÁCTILES ---
+  // Navegación contextual: listas (Todas <-> Mi Set) y canciones.
+  // Los gestos horizontales no deben interferir con el scroll vertical,
+  // botones, campos de texto ni el ordenamiento táctil de Mi Set.
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  let touchTracking = false;
+
+  document.addEventListener('touchstart', (event) => {
+    if (event.touches.length !== 1) return;
+    const touch = event.touches[0];
+    touchStartX = touch.clientX;
+    touchStartY = touch.clientY;
+    touchStartTime = Date.now();
+    touchTracking = true;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (event) => {
+    if (!touchTracking || event.changedTouches.length !== 1) return;
+    touchTracking = false;
+
+    const touch = event.changedTouches[0];
+    const deltaX = touch.clientX - touchStartX;
+    const deltaY = touch.clientY - touchStartY;
+    const elapsed = Date.now() - touchStartTime;
+
+    // Solo consideramos un gesto rápido y claramente horizontal.
+    const horizontalSwipe = Math.abs(deltaX) >= 70 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && elapsed <= 700;
+    if (!horizontalSwipe) return;
+
+    const target = event.target instanceof Element ? event.target : null;
+    if (target && target.closest('button, input, textarea, select, .drag-handle')) return;
+
+    const listView = document.getElementById('list-view');
+    const songViewer = document.getElementById('song-viewer');
+    const liveScreen = document.getElementById('live-screen');
+    const isListVisible = listView && listView.style.display !== 'none';
+    const isSongViewerVisible = songViewer && songViewer.style.display === 'block';
+    const isLiveVisible = liveScreen && liveScreen.style.display !== 'none';
+    const edgeBackSwipe = touchStartX <= 35 && deltaX >= 70;
+
+    // 1) En Modo En Vivo:
+    // - borde izquierdo -> salir de En Vivo y conservar la canción actual.
+    // - si la canción pertenece a Mi Set, los swipes centrales navegan
+    //   anterior/siguiente igual que en el visor.
+    // - si venimos de Todas, los swipes centrales no hacen nada.
+    if (isLiveVisible) {
+      if (edgeBackSwipe) {
+        closeLiveView();
+        return;
+      }
+
+      if (songViewOrigin === 'set' && songSetIds.length > 0 && currentSong) {
+        if (deltaX < 0) {
+          navigateSetlist(1);
+        } else {
+          navigateSetlist(-1);
+        }
+      }
+      return;
+    }
+
+    // 2) En resultados de búsqueda: el borde izquierdo limpia la búsqueda
+    // y regresa a la lista completa de la pestaña actual.
+    if (isListVisible) {
+      const searchInput = document.getElementById('search-input');
+      const hasSearchQuery = searchInput && searchInput.value.trim() !== '';
+
+      if (hasSearchQuery && edgeBackSwipe) {
+        searchInput.value = '';
+        renderCurrentTab();
+        return;
+      }
+    }
+
+    // 3) En las listas: cambiar entre Todas y Mi Set.
+    // Solo usamos el sentido que tiene una navegación entre ambas páginas:
+    // Todas --swipe izquierda--> Mi Set
+    // Mi Set --swipe derecha--> Todas
+    if (isListVisible) {
+      if (deltaX < 0 && currentTab === 'all') {
+        switchTab('set');
+      } else if (deltaX > 0 && currentTab === 'set') {
+        switchTab('all');
+      }
+      return;
+    }
+
+    // 4) En una canción: el gesto desde el borde izquierdo vuelve a la lista.
+    // El resto de los swipes solo navega anterior/siguiente si la canción
+    // fue abierta desde Mi Set.
+    if (!isSongViewerVisible || !currentSong) return;
+
+    if (edgeBackSwipe) {
+      showList();
+      return;
+    }
+
+    // Una canción abierta desde resultados de búsqueda conserva ese contexto:
+    // los swipes centrales no saltan al Setlist.
+    if (songViewOrigin !== 'set') return;
+
+    if (currentTab !== 'set' || songSetIds.length === 0) return;
+
+    if (deltaX < 0) {
+      navigateSetlist(1);
+    } else {
+      navigateSetlist(-1);
+    }
+  }, { passive: true });
+
+
+  // Doble toque en el centro de la canción -> entrar a Modo En Vivo.
+  // Solo se reconoce sobre el contenido de la canción, no sobre controles,
+  // botones ni campos interactivos.
+  (() => {
+    const songViewer = document.getElementById('song-viewer');
+    const songContent = document.getElementById('song-content');
+    if (!songViewer || !songContent) return;
+
+    let tapStartX = 0;
+    let tapStartY = 0;
+    let tapStartTime = 0;
+    let lastCenterTapAt = 0;
+    let lastCenterTapX = 0;
+    let lastCenterTapY = 0;
+
+    songViewer.addEventListener('touchstart', event => {
+      if (event.touches.length !== 1) return;
+      const touch = event.touches[0];
+      tapStartX = touch.clientX;
+      tapStartY = touch.clientY;
+      tapStartTime = Date.now();
+    }, { passive: true });
+
+    songViewer.addEventListener('touchend', event => {
+      if (event.changedTouches.length !== 1 || !currentSong) return;
+
+      const touch = event.changedTouches[0];
+      const elapsed = Date.now() - tapStartTime;
+      const moveX = Math.abs(touch.clientX - tapStartX);
+      const moveY = Math.abs(touch.clientY - tapStartY);
+      if (elapsed > 300 || moveX > 20 || moveY > 20) return;
+
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target || !target.closest('#song-content') ||
+          target.closest('button, input, textarea, select, .drag-handle, .block-label')) {
+        return;
+      }
+
+      const width = window.innerWidth;
+      const isCenter = touch.clientX >= width * 0.25 && touch.clientX <= width * 0.75;
+      if (!isCenter) {
+        lastCenterTapAt = 0;
+        return;
+      }
+
+      const now = Date.now();
+      const doubleTap = now - lastCenterTapAt <= 350 &&
+        Math.abs(touch.clientX - lastCenterTapX) <= 60 &&
+        Math.abs(touch.clientY - lastCenterTapY) <= 60;
+
+      if (doubleTap) {
+        event.preventDefault();
+        lastCenterTapAt = 0;
+        openLiveView();
+        return;
+      }
+
+      lastCenterTapAt = now;
+      lastCenterTapX = touch.clientX;
+      lastCenterTapY = touch.clientY;
+    }, { passive: false });
+  })();
+
   // --- REGISTRO DEL SERVICE WORKER PARA PWA ---
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('./sw.js')
+      navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
         .then((reg) => console.log('Service Worker listo:', reg.scope))
         .catch((err) => console.error('Error en SW:', err));
     });
@@ -1339,6 +1950,11 @@
 
   document.addEventListener('DOMContentLoaded', () => {  
     listenToSongs();  
+
+    const notationBtn = document.getElementById('notation-btn');
+    if (notationBtn) {
+      notationBtn.innerText = useLatinoNotation ? "Do»C" : "C»Do";
+    }
     
     const rawArea = document.getElementById('edit-raw');
     if (rawArea) {
@@ -1347,8 +1963,7 @@
 
     window.addEventListener('scroll', () => {
       if (currentRole === 'director' && currentSong && !isRemoteScroll) {
-        const scrollPercent = window.scrollY / (document.documentElement.scrollHeight - window.innerHeight);
-        broadcastToMusicians({ type: 'MANUAL_SCROLL', percent: scrollPercent });
+        broadcastReadingPosition(window);
       }
     });
   });  
