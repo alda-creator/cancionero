@@ -1,9 +1,14 @@
-const CACHE_NAME = 'cancionero-cache-v9';
+const CACHE_NAME = 'cancionero-cache-v10';
+const LEGACY_CACHE_NAMES = ['cancionero-cache-v9'];
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './js/peerjs.min.js',
+  './js/chord-model.js',
+  './js/key-detector.js',
+  './js/song-adapter.js',
+  './js/song-document.js',
   './director-fix.js'
 ];
 
@@ -37,6 +42,10 @@ self.addEventListener('install', (event) => {
     await cache.addAll([
       './manifest.json',
       './js/peerjs.min.js',
+      './js/chord-model.js',
+      './js/key-detector.js',
+      './js/song-adapter.js',
+      './js/song-document.js',
       './director-fix.js'
     ]);
 
@@ -53,6 +62,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => Promise.all(
       cacheNames
+        .filter((cacheName) =>
+          cacheName.startsWith('cancionero-cache-') ||
+          LEGACY_CACHE_NAMES.includes(cacheName)
+        )
         .filter((cacheName) => cacheName !== CACHE_NAME)
         .map((cacheName) => caches.delete(cacheName))
     ))
